@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0c0c">
+  <meta name="description" content="Una pequeña sesión de terminal. Todo empieza con espacio.">
+  <title>Windows PowerShell</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 32 32&#39;%3E%3Crect width=&#39;32&#39; height=&#39;32&#39; rx=&#39;5&#39; fill=&#39;%232d5b97&#39;/%3E%3Cpath d=&#39;m10 9 8 7-10 7m9 0h8&#39; fill=&#39;none&#39; stroke=&#39;white&#39; stroke-width=&#39;3&#39;/%3E%3C/svg%3E">
+  <style>
+    :root{color-scheme:dark;--bg:#0c0c0c;--text:#ccc;--muted:#919191;--bright:#efefef;--edge:#353535;--bar:#292929;font-size:16px}
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;width:100%;background:var(--bg);color:var(--text)}
+    body{font-family:Consolas,"Cascadia Mono","Liberation Mono",Menlo,monospace;overflow:hidden;font-size:1rem}
+    button,input{font:inherit;color:inherit}
+    button{border:0;background:transparent;cursor:pointer}
+    button:focus-visible,input:focus-visible{outline:1px solid #b8b8b8;outline-offset:-2px}
+    button:hover{color:var(--bright);background:#ffffff0c}
+    .window{height:100dvh;display:flex;flex-direction:column;background:var(--bg)}
+    .titlebar{display:flex;align-items:center;height:44px;min-height:44px;background:var(--bar);font:14px "Segoe UI",Arial,sans-serif;user-select:none;padding-left:10px;gap:4px}
+    .tab{height:36px;align-self:flex-end;display:flex;align-items:center;gap:12px;min-width:257px;padding:0 12px 0 14px;background:var(--bg);border-radius:8px 8px 0 0;color:#f4f4f4}
+    .shell-icon{width:19px;height:17px;flex-shrink:0}
+    .tab-title{font-weight:600;flex:1;white-space:nowrap}
+    .tab-close{width:24px;height:24px;font-size:19px;font-weight:300;line-height:20px;border-radius:3px}
+    .chrome-button{width:34px;height:32px;font-size:22px;line-height:24px;border-radius:3px}
+    .chrome-button.small{font-size:15px;width:25px}
+    .window-controls{display:flex;margin-left:auto;align-self:stretch}
+    .window-controls button{width:46px;font:18px Arial,sans-serif}
+    .window-controls .close:hover{background:#b6232e;color:white}
+    .terminal{padding:10px 18px 0 12px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;overscroll-behavior:contain;scrollbar-color:#3c3c3c var(--bg);scrollbar-width:thin;cursor:text;line-height:1.48}
+    .banner{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font:inherit;line-height:1.35}
+    .boot-command{margin:22px 0 16px;overflow-wrap:anywhere}
+    .dim{color:var(--muted)}
+    .bright{color:var(--bright)}
+    .output{overflow-wrap:anywhere}
+    .block{margin-bottom:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+    .line{min-height:1.48em;white-space:pre-wrap;overflow-wrap:anywhere}
+    .logline{display:flex;gap:1ch}
+    .logtime{color:var(--muted);flex-shrink:0}
+    .logtext{overflow-wrap:anywhere;min-width:0}
+    .prompt{display:flex;align-items:baseline;gap:1ch;max-width:100%;margin:10px 0 3px}
+    .prompt-label{flex-shrink:0;white-space:nowrap}
+    .input-wrap{flex:1;min-width:0;position:relative}
+    #command{padding:0;background:transparent;border:0;outline:none!important;width:100%;border-radius:0;caret-color:#ccc;line-height:1.48;min-width:1ch;box-shadow:none}
+    #command::placeholder{color:#777;opacity:1}
+    .empty-caret{position:absolute;left:0;top:3px;width:1px;height:1.15em;background:#ccc;pointer-events:none;display:none}
+    #command:placeholder-shown:not(:focus)+.empty-caret{display:block;animation:blink 1.1s steps(1) infinite}
+    .session{margin-top:12px;max-width:960px}
+    .session-line{white-space:pre-wrap;min-height:1.48em;overflow-wrap:anywhere}
+    #signal.active{color:#ededed}
+    #signal.bite{font-weight:600}
+    .footer{font-size:.875rem;display:flex;align-items:center;flex-wrap:wrap;gap:1px 16px;padding:7px 12px 8px;color:var(--muted);border-top:1px solid #242424;min-height:36px;user-select:none}
+    .footer button{font-size:inherit;padding:3px 0;white-space:nowrap;text-align:left}
+    .footer .local{margin-left:auto;font-size:.8125rem;color:#858585}
+    .row-action{color:var(--text);text-decoration:underline;text-underline-offset:3px;padding:0}
+    .key{color:#bcbcbc}
+    .catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px 36px;margin:10px 0 24px;max-width:1100px}
+    .catalog-node{min-width:0}
+    .catalog-heading{margin-bottom:8px;color:#ededed}
+    .catalog-row{display:flex;gap:1ch;justify-content:space-between;font-size:.9375rem;min-height:1.6em}
+    .catalog-name{flex:1;overflow-wrap:anywhere}
+    .catalog-value{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:#aaa}
+    .catalog-locked{color:#818181}
+    .list-row{display:flex;gap:1ch;flex-wrap:wrap;min-height:1.65em}
+    .mobile-action{display:none}
+    [hidden]{display:none!important}
+    .cloaked .terminal{padding-top:10px}
+    .cloaked .boot-command{display:none}
+    .cloaked .prompt{margin-top:22px}
+    .cloaked .footer{display:none}
+    @keyframes blink{50%{opacity:0}}
+    @media(max-width:650px){
+      .titlebar{height:39px;min-height:39px;padding-left:6px}.tab{height:33px;min-width:220px;padding-left:9px;gap:9px}.window-controls{display:none}.chrome-button.small{display:none}
+      .terminal{padding:10px 10px 0;font-size:.9375rem;line-height:1.5}.footer{gap:1px 13px;padding:6px 10px;font-size:.875rem}.footer .local{display:none}.boot-command{margin-top:18px}
+      .prompt{gap:.7ch}.prompt-label{font-size:.875rem}.catalog-grid{grid-template-columns:1fr;gap:16px}.mobile-action{display:block;padding:12px 0!important;width:100%;text-align:center!important;color:#dedede!important;border-bottom:1px solid #242424!important;min-height:46px}.desktop-action{display:none}
+    }
+    @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+<div class="window" id="app">
+  <header class="titlebar" aria-label="Ventana de terminal">
+    <div class="tab">
+      <svg class="shell-icon" viewBox="0 0 24 20" aria-hidden="true"><path d="M5 1h18l-4 18H1z" fill="#4878b7"></path><path d="m9 5 5 5-7 5m6 0h5" fill="none" stroke="#fff" stroke-width="2"></path></svg>
+      <span class="tab-title">Windows PowerShell</span>
+      <button class="tab-close" data-action="hide" aria-label="Ocultar sesión" title="Ocultar sesión (Esc)">×</button>
+    </div>
+    <button class="chrome-button" data-action="new" aria-label="Limpiar terminal" title="Limpiar terminal">+</button>
+    <button class="chrome-button small" data-action="help" aria-label="Comandos" title="Comandos">⌄</button>
+    <div class="window-controls">
+      <button data-action="hide" aria-label="Minimizar sesión" title="Ocultar sesión (Esc)">−</button>
+      <button data-action="fullscreen" aria-label="Pantalla completa" title="Pantalla completa">□</button>
+      <button class="close" data-action="hide" aria-label="Cerrar vista de sesión" title="Ocultar sesión (Esc)">×</button>
+    </div>
+  </header>
+  <main class="terminal" id="terminal" aria-label="Terminal interactiva">
+    <div class="banner">Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.</div>
+    <div class="boot-command" id="boot"><span>PS C:\Users\dev&gt; </span><span class="bright">node .\session-monitor.js</span></div>
+    <section id="game" aria-label="Sesión">
+      <div id="output" class="output"><div class="line bright">Session Monitor [Version 1.0.0]</div><div class="line dim">Conexión local establecida. Sesión sin audio.</div><div class="line"></div><div class="line">Pulsa ESPACIO para ejecutar una operación.</div><div class="line">Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Si te adelantas, se cancela.</div><div class="line">Los registros nuevos dan crédito extra. [u] mejora automáticamente.</div><div class="line"></div><div class="line dim">[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver</div><div class="line dim">decode expande los identificadores; encode restaura el formato compacto.</div><div class="line"></div></div>
+      <div id="log" role="log" aria-label="Registro de operaciones" aria-live="polite" aria-relevant="additions"></div>
+      <div class="session" id="session">
+        <div id="metrics" class="session-line dim">local  /  428 cr  /  16 ops  /  index 5/24  /  chain 15</div>
+        <div id="signal" class="session-line " role="status" aria-live="polite">READY  ·  [ESPACIO] ejecutar</div>
+        <div id="hint" class="session-line dim">Espera a RESPONSE_READY y vuelve a pulsar espacio.</div>
+      </div>
+    </section>
+    <form class="prompt" id="command-form" autocomplete="off">
+      <label class="prompt-label" for="command">PS C:\Users\dev&gt;</label>
+      <div class="input-wrap"><input id="command" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Comando de terminal" enterkeyhint="send" maxlength="160" placeholder=""><span class="empty-caret" aria-hidden="true"></span></div>
+    </form>
+  </main>
+  <footer class="footer" id="footer">
+    <button class="mobile-action" id="touch-action" data-action="poll">[ ejecutar ]</button>
+    <button class="desktop-action" data-action="poll"><span class="key">[espacio]</span> ejecutar</button>
+    <button data-action="catalog"><span class="key">[c]</span> registro</button>
+    <button data-action="upgrade"><span class="key">[u]</span> mejorar</button>
+    <button data-action="help"><span class="key">[tab]</span> comandos</button>
+    <button data-action="hide"><span class="key">[esc]</span> ocultar</button>
+    <span class="local" id="save-status">sesión local</span>
+  </footer>
+</div>
+<script id="engine">
+/* Session Monitor — dependency-free, offline-capable terminal game. */
+(() => {
+  'use strict';
+  const VERSION = 1;
+  const SAVE_KEY = 'session-monitor.save.v1';
+  const BACKUP_KEY = 'session-monitor.backup.v1';
+  const MAX = 1e12;
+  const NODES = [
+    {id:'local',name:'Estanque',need:0},
+    {id:'stream',name:'Río',need:12},
+    {id:'remote',name:'Costa',need:35},
+    {id:'deep',name:'Abismo',need:70}
+  ];
+  const SPECIES = [
+    ['L01','Alburno',0,0,8,.04,.18],['L02','Perca',0,0,12,.15,1.2],['L03','Carpa',0,1,23,1,6],['L04','Tenca',0,1,30,.4,3.5],['L05','Lucio',0,2,65,2,12],['L06','Carpa dorada',0,3,160,.5,4],
+    ['S01','Gobio',1,0,15,.04,.3],['S02','Barbo',1,0,21,.4,3.5],['S03','Trucha',1,1,39,.3,2.5],['S04','Anguila',1,1,49,.5,4],['S05','Salmón',1,2,105,2,15],['S06','Esturión albino',1,3,240,8,55],
+    ['R01','Sardina',2,0,25,.03,.2],['R02','Caballa',2,0,32,.2,1.5],['R03','Dorada',2,1,62,.5,6],['R04','Lubina',2,1,80,.6,9],['R05','Atún rojo',2,2,160,12,180],['R06','Pez luna',2,3,370,50,450],
+    ['D01','Pez linterna',3,0,42,.05,.4],['D02','Pez hacha',3,0,56,.04,.2],['D03','Rape abisal',3,1,95,.5,15],['D04','Quimera',3,1,125,1,6],['D05','Calamar gigante',3,2,250,25,200],['D06','Celacanto',3,3,600,15,90]
+  ].map(([id,name,node,tier,value,min,max])=>({id,name,node,tier,value,min,max}));
+  const TIER = ['común','poco común','raro','legendario'];
+  const UPGRADES = [
+    {id:'speed',label:'latency',decoded:'Caña',base:55,description:'Menos espera entre respuestas',max:8},
+    {id:'buffer',label:'buffer',decoded:'Sedal',base:45,description:'Más tiempo para recoger',max:6},
+    {id:'luck',label:'decoder',decoded:'Cebo',base:70,description:'Más registros raros y nuevos',max:8}
+  ];
+  const ACHIEVEMENTS = [
+    {id:'first',label:'Primer paquete',decoded:'Primera captura',reward:25,met:s=>s.caught>=1},
+    {id:'ten',label:'Lote de 10',decoded:'Diez capturas',reward:80,met:s=>s.caught>=10},
+    {id:'streak',label:'Enlace estable',decoded:'Racha de 5',reward:100,met:s=>s.bestStreak>=5},
+    {id:'perfect',label:'Sin latencia',decoded:'10 capturas perfectas',reward:150,met:s=>s.perfects>=10},
+    {id:'rare',label:'Prioridad 03',decoded:'Primer legendario',reward:175,met:s=>SPECIES.some(f=>f.tier===3&&s.collection[f.id])},
+    {id:'local',label:'Índice local completo',decoded:'Estanque completo',reward:200,met:s=>SPECIES.filter(f=>f.node===0).every(f=>s.collection[f.id])},
+    {id:'fifty',label:'Lote de 50',decoded:'Cincuenta capturas',reward:250,met:s=>s.caught>=50},
+    {id:'hundred',label:'Lote de 100',decoded:'Cien capturas',reward:450,met:s=>s.caught>=100},
+    {id:'all',label:'Índice íntegro',decoded:'Las 24 especies',reward:1500,met:s=>SPECIES.every(f=>s.collection[f.id])}
+  ];
+  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],bestWeight:0,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
+  function finite(n,min=0,max=MAX){return typeof n==='number'&&Number.isFinite(n)&&n>=min&&n<=max;}
+  function validate(raw){
+    if(!raw||typeof raw!=='object'||raw.version!==VERSION)throw Error('Versión de sesión no compatible.');
+    const s=fresh();
+    for(const k of ['credits','earned','caught','casts','missed','perfects','streak','bestStreak','bestWeight','createdAt','updatedAt']){
+      if(!finite(raw[k],0,k.endsWith('At')?1e15:MAX))throw Error('Datos de sesión no válidos.');
+      s[k]=raw[k];
+    }
+    for(const k of ['caught','casts','missed','perfects','streak','bestStreak'])if(!Number.isInteger(s[k]))throw Error('Contadores no válidos.');
+    if(!Number.isInteger(raw.node)||raw.node<0||raw.node>3||s.caught<NODES[raw.node].need)throw Error('Nodo no válido.');
+    s.node=raw.node;
+    for(const u of UPGRADES){if(!Number.isInteger(raw.upgrades?.[u.id])||!finite(raw.upgrades[u.id],0,u.max))throw Error('Módulos no válidos.');s.upgrades[u.id]=raw.upgrades[u.id];}
+    if(!raw.collection||typeof raw.collection!=='object'||Array.isArray(raw.collection))throw Error('Registro no válido.');
+    for(const [id,c] of Object.entries(raw.collection)){
+      if(!SPECIES.some(f=>f.id===id)||!c||!Number.isInteger(c.count)||!finite(c.count,1)||!finite(c.best,.001,1000))throw Error('Registro no válido.');
+      s.collection[id]={count:c.count,best:c.best};
+    }
+    for(const k of ['nodeCatches','nodeDry']){
+      if(!Array.isArray(raw[k])||raw[k].length!==4||raw[k].some(n=>!Number.isInteger(n)||!finite(n)))throw Error('Índice no válido.');
+      s[k]=raw[k].slice();
+    }
+    if(!Array.isArray(raw.achievements)||raw.achievements.some(id=>!ACHIEVEMENTS.some(a=>a.id===id)))throw Error('Hitos no válidos.');
+    if(Object.values(s.collection).reduce((a,c)=>a+c.count,0)!==s.caught||s.nodeCatches.reduce((a,n)=>a+n,0)!==s.caught||s.perfects>s.caught||s.streak>s.caught||s.bestStreak>s.caught||s.caught+s.missed>s.casts)throw Error('Los contadores de la sesión no coinciden.');
+    s.achievements=[...new Set(raw.achievements)];s.decoded=raw.decoded===true;
+    return s;
+  }
+  function price(s,u){return Math.round(u.base*Math.pow(1.8,s.upgrades[u.id]));}
+  function timing(s,rng=Math.random){return {wait:Math.max(1000,(2100+rng()*2000)*Math.pow(.9,s.upgrades.speed)),window:2800+s.upgrades.buffer*400,perfect:850+s.upgrades.buffer*90};}
+  function chooseFish(s,rng=Math.random){
+    const pool=SPECIES.filter(f=>f.node===s.node);
+    const missing=pool.filter(f=>!s.collection[f.id]);
+    // A bounded dry streak keeps the collection achievable without grinding forever.
+    if(missing.length&&(s.nodeCatches[s.node]===0||s.nodeDry[s.node]>=10))return missing[Math.min(missing.length-1,Math.floor(rng()*missing.length))];
+    const weights=pool.map(f=>[37,20,8,3][f.tier]*(f.tier>=2?1+s.upgrades.luck*.2:1)*(!s.collection[f.id]?1.25+s.upgrades.luck*.09:1));
+    let p=rng()*weights.reduce((a,b)=>a+b,0);
+    for(let i=0;i<pool.length;i++){p-=weights[i];if(p<0)return pool[i];}
+    return pool[pool.length-1];
+  }
+  function rewardCatch(s,fish,perfect,rng=Math.random){
+    const weight=Math.round((fish.min+(fish.max-fish.min)*Math.pow(rng(),1.6))*1000)/1000;
+    const previous=s.collection[fish.id];const isNew=!previous;const record=!!previous&&weight>previous.best;
+    s.caught++;s.streak++;s.bestStreak=Math.max(s.bestStreak,s.streak);s.nodeCatches[s.node]++;s.nodeDry[s.node]=isNew?0:s.nodeDry[s.node]+1;
+    if(perfect)s.perfects++;
+    const multiplier=1+Math.min(s.streak-1,10)*.04;
+    const base=Math.round(fish.value*(.9+weight/fish.max*.35)*multiplier*(perfect?1.5:1));
+    const discovery=isNew?fish.value:0;
+    s.credits+=base+discovery;s.earned+=base+discovery;
+    s.collection[fish.id]={count:(previous?.count||0)+1,best:Math.max(previous?.best||0,weight)};
+    s.bestWeight=Math.max(s.bestWeight,weight);
+    const milestones=[];
+    for(const a of ACHIEVEMENTS)if(!s.achievements.includes(a.id)&&a.met(s)){s.achievements.push(a.id);s.credits+=a.reward;s.earned+=a.reward;milestones.push(a);}
+    return {fish,weight,isNew,record,base,discovery,perfect,milestones,unlocks:NODES.filter(n=>n.need===s.caught)};
+  }
+  const Core={VERSION,NODES,SPECIES,UPGRADES,ACHIEVEMENTS,fresh,validate,price,timing,chooseFish,rewardCatch};
+  // A separate engine export keeps persistence and progression verifiable without a browser.
+  if(typeof module!=='undefined'&&module.exports){module.exports=Core;return;}
+
+  const $=id=>document.getElementById(id);
+  const app=$('app'),terminal=$('terminal'),input=$('command'),output=$('output'),log=$('log');
+  let state=fresh(),storageOK=true,loadMessage='',locked=!!navigator.locks?.request;
+  try{
+    const primary=localStorage.getItem(SAVE_KEY);
+    if(primary){try{state=validate(JSON.parse(primary));}catch{
+      const backup=localStorage.getItem(BACKUP_KEY);
+      if(backup){state=validate(JSON.parse(backup));loadMessage='Sesión recuperada desde la copia local.';}
+      else{loadMessage='El guardado no se pudo leer. Se ha conservado el archivo original; usa import para recuperar una copia.';storageOK=false;}
+    }}
+  }catch{storageOK=false;loadMessage='Guardado local no disponible. Usa export antes de cerrar la sesión.';}
+  let phase='idle',castAt=0,biteAt=0,expiresAt=0,perfectUntil=0,pausedAt=0,hidden=false,view='logs',viewPausedAt=0;
+  let lastSignal='',catchPending=null;
+  let history=[],historyPos=0,rows=[],lastResult='',saveTimer=null,resetUntil=0;
+  let logCounter=0;
+  // Ignore an accidental double tap right after casting.
+  const EARLY_GRACE=300;
+  const fmt=n=>Math.round(n).toLocaleString('es-ES');
+  const kg=n=>n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:3});
+  const code=f=>state.decoded?f.name:f.id;
+  const nodeLabel=i=>state.decoded?NODES[i].name:NODES[i].id;
+  const isBusy=()=>phase==='waiting'||phase==='bite';
+  const scrollDown=()=>requestAnimationFrame(()=>{terminal.scrollTop=terminal.scrollHeight;});
+  function clock(){return new Date().toLocaleTimeString('es-ES',{hour12:false});}
+  function line(text,kind='normal'){
+    const row=document.createElement('div');row.className='line';if(kind==='dim')row.classList.add('dim');if(kind==='bright')row.classList.add('bright');row.textContent=text;output.append(row);return row;
+  }
+  function blank(){line('');}
+  function addLog(text,kind='normal'){
+    rows.push({time:clock(),text,kind,id:++logCounter});if(rows.length>55)rows.shift();
+    if(view==='logs'&&!hidden){renderLogs();scrollDown();}
+  }
+  function renderLogs(){
+    const retained=new Set(rows.map(r=>String(r.id)));
+    for(const child of [...log.children])if(!retained.has(child.dataset.row))child.remove();
+    const rendered=new Set([...log.children].map(el=>el.dataset.row));
+    for(const row of rows){if(rendered.has(String(row.id)))continue;const el=document.createElement('div');el.dataset.row=String(row.id);el.className='logline'+(row.kind==='bright'?' bright':row.kind==='dim'?' dim':'');const stamp=document.createElement('span');stamp.className='logtime';stamp.textContent='['+row.time+']';const msg=document.createElement('span');msg.className='logtext';msg.textContent=row.text;el.append(stamp,msg);log.append(el);}
+  }
+  function save(force=false){
+    if(locked)return false;
+    clearTimeout(saveTimer);
+    if(!force){saveTimer=setTimeout(()=>save(true),80);return true;}
+    state.updatedAt=Date.now();
+    try{
+      if(!storageOK){$('save-status').textContent='export para guardar';return false;}
+      const previous=localStorage.getItem(SAVE_KEY);
+      if(previous){try{validate(JSON.parse(previous));localStorage.setItem(BACKUP_KEY,previous);}catch{}}
+      localStorage.setItem(SAVE_KEY,JSON.stringify(state));$('save-status').textContent='guardado local';return true;
+    }catch{storageOK=false;$('save-status').textContent='export para guardar';addLog('WARN save: almacenamiento no disponible. Usa export para guardar.');return false;}
+  }
+  function metrics(){
+    $('metrics').textContent=`${nodeLabel(state.node)}  /  ${fmt(state.credits)} cr  /  ${state.caught} ops  /  index ${Object.keys(state.collection).length}/24${state.streak>1?'  /  chain '+state.streak:''}`;
+  }
+  function setSignal(text,kind=''){
+    if(text!==lastSignal){$('signal').textContent=text;lastSignal=text;}
+    $('signal').className='session-line '+kind;
+  }
+  function tick(){
+    if(hidden||locked||view!=='logs')return;
+    const t=performance.now();
+    if(phase==='waiting'&&t>=biteAt){phase='bite';setSignal('RESPONSE_READY  ·  [ESPACIO] confirmar','active bite');$('hint').textContent='Confirmación rápida: +50% de crédito.';}
+    if(phase==='bite'&&t>expiresAt){miss();return;}
+    if(phase==='waiting'){
+      const dots='.'.repeat(1+Math.floor(t/550)%3);
+      setSignal('polling '+NODES[state.node].id+':443'+dots+'  Esperando respuesta','active');
+    }
+    if(phase==='bite'){
+      const left=Math.max(0,(expiresAt-t)/1000).toFixed(1);
+      $('hint').textContent=`timeout ${left}s${t<=perfectUntil?'  /  perfect window':'  /  confirma ahora'}`;
+    }
+  }
+  function idleSignal(){
+    metrics();
+    if(locked){setSignal('SESSION_LOCKED  ·  sesión activa en otra pestaña');$('hint').textContent='Vuelve a esa pestaña o cierra la otra y recarga esta.';return;}
+    setSignal('READY  ·  [ESPACIO] ejecutar');
+    $('hint').textContent=lastResult||'Espera a RESPONSE_READY y vuelve a pulsar espacio.';
+    $('touch-action').textContent='[ ejecutar ]';
+  }
+  function action(){
+    if(hidden||locked)return false;
+    if(view!=='logs'){showView('logs');return true;}
+    const t=performance.now();
+    if(phase==='idle'){
+      const timingData=timing(state);state.casts++;catchPending=chooseFish(state);phase='waiting';castAt=t;biteAt=t+timingData.wait;expiresAt=biteAt+timingData.window;perfectUntil=biteAt+timingData.perfect;
+      lastResult='';addLog('> poll --node '+NODES[state.node].id,'dim');$('hint').textContent='Espera a RESPONSE_READY. Si te adelantas, se cancela.';$('touch-action').textContent='[ esperando respuesta… ]';save();tick();return true;
+    }
+    if(phase==='waiting'&&t<biteAt){if(t-castAt>=EARLY_GRACE)miss(true);return false;}
+    if(t>expiresAt){miss();return false;}
+    const result=rewardCatch(state,catchPending,t<=perfectUntil);phase='idle';catchPending=null;
+    const suffix=[result.perfect?'PERFECT':null,result.isNew?'NEW':result.record?'RECORD':null].filter(Boolean).join(' / ');
+    addLog(`200 OK  ${code(result.fish)}  ${state.decoded?kg(result.weight)+' kg':'payload '+kg(result.weight)+' MB'}  +${fmt(result.base+result.discovery)} cr${suffix?'  ['+suffix+']':''}`,result.fish.tier>=2?'bright':'normal');
+    for(const m of result.milestones)addLog(`checkpoint: ${state.decoded?m.decoded:m.label}  +${fmt(m.reward)} cr`,'bright');
+    for(const n of result.unlocks)addLog(`node ${n.id} disponible  ·  tecla ${NODES.indexOf(n)+1}`,'bright');
+    if(result.milestones.some(m=>m.id==='all'))addLog('INDEX COMPLETE  ·  24/24. Sesión completada. Puedes seguir batiendo récords.','bright');
+    lastResult=result.isNew?'Nuevo registro añadido al índice. [c] consultar':'Operación completada. [ESPACIO] siguiente';
+    save();idleSignal();scrollDown();return true;
+  }
+  function miss(early=false){
+    phase='idle';catchPending=null;state.missed++;state.streak=0;lastResult=early?'Demasiado pronto: espera a RESPONSE_READY. [ESPACIO] reintentar':'Sin penalización de crédito. [ESPACIO] reintentar';addLog(early?'499 CLIENT CLOSED REQUEST  ·  Confirmación antes de la respuesta.':'408 TIMEOUT  ·  La respuesta ha caducado.');save();idleSignal();
+  }
+  function pauseForView(){if(isBusy()&&!viewPausedAt)viewPausedAt=performance.now();}
+  function resumeFromView(){if(viewPausedAt){const d=performance.now()-viewPausedAt;biteAt+=d;expiresAt+=d;perfectUntil+=d;viewPausedAt=0;}}
+  function showView(next){
+    if(hidden)return;
+    if(next!=='logs')pauseForView();else resumeFromView();
+    view=next;output.replaceChildren();log.hidden=next!=='logs';$('session').hidden=next!=='logs';
+    if(next==='logs'){
+      if(!rows.length){line('Session Monitor [Version 1.0.0]','bright');line('Conexión local establecida. Sesión sin audio.','dim');blank();line('Pulsa ESPACIO para ejecutar una operación.');line('Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Si te adelantas, se cancela.');line('Los registros nuevos dan crédito extra. [u] mejora automáticamente.');blank();line('[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver','dim');line('decode expande los identificadores; encode restaura el formato compacto.','dim');blank();if(loadMessage){line(loadMessage);blank();}}
+      renderLogs();if(!isBusy())idleSignal();else tick();
+    }else if(next==='help')renderHelp();
+    else if(next==='catalog')renderCatalog();
+    else if(next==='shop')renderShop();
+    else if(next==='stats')renderStats();
+    else if(next==='nodes')renderNodes();
+    else if(next==='achievements')renderAchievements();
+    if(next!=='logs'){blank();line('[ESPACIO] volver a la sesión'+(isBusy()?' · operación en pausa':''),'dim');}
+    terminal.scrollTop=0;input.placeholder='';input.value='';
+  }
+  function renderHelp(){
+    line('session-monitor / comandos','bright');blank();
+    const entries=[
+      ['ESPACIO','Ejecutar. Esperar. Confirmar cuando llegue la respuesta; si te adelantas, se cancela.'],
+      ['c / catalog','Abrir el índice de registros.'],['u / upgrade','Comprar la mejora más barata disponible.'],['shop','Ver módulos y precios; upgrade speed|buffer|luck.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones.'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
+    ];
+    for(const [cmd,desc] of entries){line(cmd,'bright');line('  '+desc);}
+    blank();line('Los menús pausan la operación. Cambiar de pestaña también oculta y pausa.','dim');line('Guardado automático en este navegador. Sin conexión entre dispositivos.','dim');line('↑ ↓ historial · Tab completa comandos escritos · Enter ejecuta','dim');
+  }
+  function renderCatalog(){
+    line(`registry / ${Object.keys(state.collection).length} de 24 identificadores`,'bright');line(state.decoded?'Colección de especies · mejor peso registrado':'Índice de payloads · tamaño máximo registrado','dim');blank();
+    const grid=document.createElement('div');grid.className='catalog-grid';
+    NODES.forEach((node,i)=>{
+      const group=document.createElement('div');group.className='catalog-node';const title=document.createElement('div');title.className='catalog-heading';const found=SPECIES.filter(f=>f.node===i&&state.collection[f.id]).length;title.textContent=`[${i+1}] ${nodeLabel(i)}  ${found}/6${state.caught<node.need?' · '+node.need+' ops':''}`;group.append(title);
+      for(const f of SPECIES.filter(f=>f.node===i)){
+        const c=state.collection[f.id],row=document.createElement('div');row.className='catalog-row'+(!c?' catalog-locked':'');const name=document.createElement('span');name.className='catalog-name';name.textContent=`${c?'+':'·'} ${c?code(f):(state.decoded?'Sin descubrir':f.id+' / pending')}`;const value=document.createElement('span');value.className='catalog-value';value.textContent=c?`${kg(c.best)} ${state.decoded?'kg':'MB'} ×${c.count}`:'—';row.append(name,value);group.append(row);
+        if(c){const tier=document.createElement('div');tier.className='catalog-row dim';tier.textContent='  '+(state.decoded?TIER[f.tier]:'priority 0'+f.tier);group.append(tier);}
+      }grid.append(group);
+    });output.append(grid);
+    line(state.decoded?'encode para volver a mostrar códigos.':'decode para expandir los identificadores.','dim');
+  }
+  function renderShop(){
+    line(`modules / ${fmt(state.credits)} cr disponibles`,'bright');blank();
+    for(const u of UPGRADES){const level=state.upgrades[u.id],cost=price(state,u);line(`${u.label}${state.decoded?' / '+u.decoded:''}  v${level}/${u.max}`,'bright');line('  '+u.description);line(level===u.max?'  MAX LEVEL':`  ${fmt(cost)} cr  ·  upgrade ${u.id}${state.credits<cost?'  (faltan '+fmt(cost-state.credits)+' cr)':''}`);blank();}
+    line('Pulsa [u] para instalar la mejora más barata.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03 y registros nuevos','dim');
+  }
+  function upgrade(id){
+    if(hidden||locked)return false;
+    if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de instalar módulos.');if(view!=='logs')showView('logs');return false;}
+    let u=id?UPGRADES.find(u=>u.id===id||u.label===id):UPGRADES.filter(u=>state.upgrades[u.id]<u.max).sort((a,b)=>price(state,a)-price(state,b))[0];
+    if(!u){addLog(id?'Módulo no encontrado. Usa shop.':'Todos los módulos están al máximo.');if(view!=='logs')showView('logs');return false;}
+    if(state.upgrades[u.id]===u.max){addLog(u.label+': nivel máximo.');if(view!=='logs')showView('logs');return false;}
+    const cost=price(state,u);
+    if(state.credits<cost){addLog(`${u.label}: necesitas ${fmt(cost)} cr. Faltan ${fmt(cost-state.credits)} cr.`);if(view!=='logs')showView('logs');return false;}
+    state.credits-=cost;state.upgrades[u.id]++;addLog(`module installed: ${u.label} v${state.upgrades[u.id]}  −${fmt(cost)} cr`,'bright');save();showView('logs');return true;
+  }
+  function renderNodes(){
+    line('nodes / destinos disponibles','bright');blank();
+    NODES.forEach((node,i)=>{line(`[${i+1}] ${nodeLabel(i)}${state.node===i?'  < active':''}`,'bright');line('    '+(state.caught>=node.need?'ONLINE · tecla '+(i+1):'LOCKED · '+node.need+' operaciones ('+state.caught+'/'+node.need+')'));});
+  }
+  function switchNode(index){
+    if(hidden||locked)return false;
+    if(!Number.isInteger(index)||index<0||index>3){addLog('Nodo no válido. Usa nodes.');return false;}
+    if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de cambiar de nodo.');if(view!=='logs')showView('logs');return false;}
+    if(state.caught<NODES[index].need){addLog(`node ${NODES[index].id}: faltan ${NODES[index].need-state.caught} operaciones.`);showView('logs');return false;}
+    state.node=index;lastResult='Conexión establecida. [ESPACIO] ejecutar';addLog('connected: '+nodeLabel(index),'bright');save();showView('logs');return true;
+  }
+  function renderStats(){
+    line('session / status','bright');blank();
+    for(const [key,val] of [
+      ['Crédito disponible',fmt(state.credits)+' cr'],['Crédito total obtenido',fmt(state.earned)+' cr'],['Operaciones completadas',state.caught],['Solicitudes enviadas',state.casts],['Operaciones fallidas',state.missed],['Confirmaciones perfectas',state.perfects],['Racha actual / mejor',state.streak+' / '+state.bestStreak],['Registros descubiertos',Object.keys(state.collection).length+' / 24'],['Mayor '+(state.decoded?'peso':'payload'),kg(state.bestWeight)+(state.decoded?' kg':' MB')],['Hitos completados',state.achievements.length+' / '+ACHIEVEMENTS.length],['Nodo activo',nodeLabel(state.node)],['Guardado',storageOK?'automático · solo este navegador':'no disponible · usa export']
+    ])line(key+': '+val);
+  }
+  function renderAchievements(){
+    line('checkpoints / recompensas automáticas','bright');blank();for(const a of ACHIEVEMENTS)line(`${state.achievements.includes(a.id)?'[OK]':'[  ]'} ${state.decoded?a.decoded:a.label}  +${fmt(a.reward)} cr`);blank();line('Objetivo de la sesión: completar los 24 registros.','dim');
+  }
+  function cloak(){
+    if(hidden)return;hidden=true;pausedAt=performance.now();input.value='';app.classList.add('cloaked');$('game').hidden=true;$('boot').hidden=true;input.placeholder='';save(true);
+    try{sessionStorage.setItem('session-monitor.hidden','1');}catch{}
+    terminal.scrollTop=0;
+  }
+  function reveal(){
+    if(!hidden)return;const dt=performance.now()-pausedAt;if(isBusy()&&!viewPausedAt){biteAt+=dt;expiresAt+=dt;perfectUntil+=dt;}
+    hidden=false;app.classList.remove('cloaked');$('game').hidden=false;$('boot').hidden=false;input.value='';try{sessionStorage.removeItem('session-monitor.hidden');}catch{}showView(view);scrollDown();
+  }
+  function clean(){
+    if(hidden){input.value='';return;}
+    rows=[];showView('logs');
+  }
+  function download(){
+    if(locked)return;save(true);const blob=new Blob([JSON.stringify({format:'session-monitor',savedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='session-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);addLog('export: copia de la sesión preparada.');
+  }
+  function restore(){
+    if(locked)return;if(isBusy()){addLog('Termina la operación antes de importar.');showView('logs');return;}
+    pauseForView();const picker=document.createElement('input');picker.type='file';picker.accept='.json,application/json';
+    picker.addEventListener('change',async()=>{
+      const file=picker.files?.[0];if(!file)return;
+      if(file.size>300000){addLog('import: archivo demasiado grande.');showView('logs');return;}
+      let next;try{const data=JSON.parse(await file.text());if(data.format!=='session-monitor')throw Error('No es una copia de Session Monitor.');next=validate(data.state);}catch(e){addLog('import: '+(e.message||'Archivo no válido.'));showView('logs');return;}
+      reveal();showView('logs');
+      if(!window.confirm(`Importar ${next.caught} operaciones y ${fmt(next.credits)} cr? Sustituirá la sesión actual.`)){addLog('import: cancelado.');return;}
+      state=next;storageOK=true;phase='idle';viewPausedAt=0;lastResult='';rows=[];save(true);addLog('import: sesión recuperada.','bright');showView('logs');
+    });picker.click();
+  }
+  async function fullscreen(){
+    try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{if(!hidden){addLog('Pantalla completa no disponible aquí. Abre la sesión en una pestaña y pulsa F11.');showView('logs');}}
+  }
+  function execute(raw){
+    if(hidden||locked)return false;const trimmed=raw.trim();if(!trimmed)return false;
+    if(trimmed.length>160)return false;
+    history.push(trimmed);if(history.length>40)history.shift();historyPos=history.length;
+    const [cmd,...args]=trimmed.toLowerCase().split(/\s+/);input.value='';
+    if(['poll','cast','run','reel'].includes(cmd))return action();
+    if(['help','ayuda','?'].includes(cmd)){showView('help');return true;}
+    if(['catalog','collection','index','c'].includes(cmd)){showView('catalog');return true;}
+    if(['shop','modules'].includes(cmd)){showView('shop');return true;}
+    if(['upgrade','u'].includes(cmd))return upgrade(args[0]);
+    if(['status','stats','s'].includes(cmd)){showView('stats');return true;}
+    if(['goals','achievements'].includes(cmd)){showView('achievements');return true;}
+    if(['nodes','map'].includes(cmd)){showView('nodes');return true;}
+    if(['node','connect'].includes(cmd)){const n=NODES.findIndex(n=>n.id===args[0]);return switchNode(n>=0?n:Number(args[0])-1);}
+    if(/^[1-4]$/.test(cmd))return switchNode(Number(cmd)-1);
+    if(['decode','encode'].includes(cmd)){state.decoded=cmd==='decode';rows=[];addLog('output format: '+(state.decoded?'expanded':'compact'),'dim');save();showView(view);return true;}
+    if(['clear','cls'].includes(cmd)){clean();return true;}
+    if(['pause','exit','hide'].includes(cmd)){cloak();return true;}
+    if(['resume','logs','back'].includes(cmd)){showView('logs');return true;}
+    if(cmd==='export'){download();return true;}
+    if(cmd==='import'){restore();return true;}
+    if(cmd==='fullscreen'){void fullscreen();return true;}
+    if(cmd==='reset'){
+      if(isBusy()){addLog('Termina la operación antes de reiniciar.');showView('logs');return false;}
+      if(args[0]==='confirm'&&performance.now()<resetUntil){state=fresh();rows=[];lastResult='';resetUntil=0;phase='idle';viewPausedAt=0;storageOK=true;save(true);addLog('Sesión reiniciada.');showView('logs');return true;}
+      resetUntil=performance.now()+15000;addLog('Se borrará tu progreso. Escribe reset confirm en 15 s para confirmar. Export guarda una copia.');showView('logs');return false;
+    }
+    addLog('Comando no reconocido: '+trimmed+'. Usa help.');showView('logs');return false;
+  }
+  $('command-form').addEventListener('submit',e=>{e.preventDefault();if(hidden){input.value='';return;}if(input.value.trim())execute(input.value);else action();});
+  const completions=['poll','catalog','upgrade','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();hidden?reveal():cloak();input.blur();return;}
+    if(e.altKey||e.ctrlKey||e.metaKey||e.isComposing)return;
+    if(hidden){if(e.key==='Enter'){e.preventDefault();input.value='';}return;}
+    if(e.repeat&&(e.code==='Space'||['u','1','2','3','4'].includes(e.key))) {e.preventDefault();return;}
+    if(e.key==='Tab'){
+      if(document.activeElement===input&&input.value.trim()){e.preventDefault();const c=completions.filter(c=>c.startsWith(input.value.trim()));if(c.length===1)input.value=c[0];else if(c.length>1){addLog(c.join('  '));showView('logs');}}
+      else if(document.activeElement===input||document.activeElement===document.body){e.preventDefault();showView(view==='help'?'logs':'help');input.blur();}
+      return;
+    }
+    if(document.activeElement===input){
+      if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();historyPos=Math.max(0,Math.min(history.length,historyPos+(e.key==='ArrowUp'?-1:1)));input.value=history[historyPos]||'';return;}
+      if(e.code==='Space'&&!input.value){e.preventDefault();action();return;}
+      return;
+    }
+    if(e.code==='Space'){e.preventDefault();action();return;}
+    if(e.target instanceof HTMLButtonElement)return;
+    if(e.key==='c'){e.preventDefault();showView(view==='catalog'?'logs':'catalog');return;}
+    if(e.key==='u'){e.preventDefault();upgrade();return;}
+    if(e.key==='s'){e.preventDefault();showView(view==='stats'?'logs':'stats');return;}
+    if(/^[1-4]$/.test(e.key)){e.preventDefault();switchNode(Number(e.key)-1);return;}
+    if(e.key==='?'||e.key==='F1'){e.preventDefault();showView('help');return;}
+    if(e.key.length===1){input.focus();}
+  });
+  document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',()=>{
+    const a=btn.dataset.action;if(hidden&&a!=='fullscreen'){if(a==='hide')reveal();btn.blur();return;}
+    if(a==='poll')action();else if(a==='hide')cloak();else if(a==='catalog')showView(view==='catalog'?'logs':'catalog');else if(a==='help')showView(view==='help'?'logs':'help');else if(a==='upgrade')upgrade();else if(a==='fullscreen')void fullscreen();else if(a==='new')clean();btn.blur();
+  }));
+  terminal.addEventListener('click',e=>{if(!window.getSelection()?.toString()&&!(e.target instanceof HTMLButtonElement))input.focus({preventScroll:true});});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)cloak();});
+  window.addEventListener('pagehide',()=>save(true));
+  window.addEventListener('beforeunload',()=>save(true));
+  window.addEventListener('storage',e=>{
+    if(e.key===SAVE_KEY&&e.newValue){locked=true;clearTimeout(saveTimer);phase='idle';catchPending=null;lastResult='';if(!hidden)showView('logs');}
+  });
+  // Web Locks prevent two tabs from spending or overwriting the same local save.
+  if(navigator.locks?.request){
+    navigator.locks.request('session-monitor-writer',{ifAvailable:true},async lock=>{
+      if(!lock){locked=true;phase='idle';if(!hidden)showView('logs');return;}
+      locked=false;if(!hidden)showView(view);
+      await new Promise(resolve=>window.addEventListener('pagehide',resolve,{once:true}));
+    }).catch(()=>{locked=false;if(!hidden)showView(view);});
+  }
+  showView('logs');
+  if(!storageOK)$('save-status').textContent='export para guardar';
+  try{if(sessionStorage.getItem('session-monitor.hidden')==='1')cloak();}catch{}
+  setInterval(()=>{tick();if(!hidden&&phase==='bite')$('touch-action').textContent='[ confirmar respuesta ]';},80);
+  // Structured actions share the exact state transitions used by keyboard and touch.
+  const context=document.modelContext;
+  if(context?.registerTool){
+    const lifecycle=new AbortController();
+    const snapshot=()=>({phase,hidden,locked,view,node:NODES[state.node].id,credits:state.credits,caught:state.caught,discovered:Object.keys(state.collection).length,upgrades:{...state.upgrades}});
+    const register=tool=>{try{Promise.resolve(context.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{});}catch{}};
+    register({name:'read_session',description:'Read local session progress and current operation state.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute:()=>snapshot()});
+    register({name:'execute_session_command',description:'Execute a visible game terminal command. Mutates the same local game state as the terminal. Cannot access a real shell.',inputSchema:{type:'object',properties:{command:{type:'string',maxLength:160}},required:['command'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:args=>{if(!args||typeof args.command!=='string'||args.command.length>160)throw Error('A command of at most 160 characters is required.');const command=args.command.trim();if(!/^(poll|catalog|upgrade(?: (?:speed|buffer|luck))?|shop|status|nodes|node [1-4]|goals|decode|encode|clear|help)$/.test(command))throw Error('Command not available through this tool.');if(hidden||locked)throw Error('Session is hidden or active in another tab.');return {ok:execute(command),...snapshot()};}});
+    window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});
+  }
+})();
+</script>
+
+
+</body></html>
