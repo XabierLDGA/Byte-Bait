@@ -97,7 +97,7 @@
 Copyright (C) Microsoft Corporation. All rights reserved.</div>
     <div class="boot-command" id="boot"><span>PS C:\Users\dev&gt; </span><span class="bright">node .\session-monitor.js</span></div>
     <section id="game" aria-label="Sesión">
-      <div id="output" class="output"><div class="line bright">Session Monitor [Version 1.0.0]</div><div class="line dim">Conexión local establecida. Sesión sin audio.</div><div class="line"></div><div class="line">Pulsa ESPACIO para ejecutar una operación.</div><div class="line">Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Si te adelantas, se cancela.</div><div class="line">Los registros nuevos dan crédito extra. [u] mejora automáticamente.</div><div class="line"></div><div class="line dim">[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver</div><div class="line dim">decode expande los identificadores; encode restaura el formato compacto.</div><div class="line"></div></div>
+      <div id="output" class="output"><div class="line bright">Session Monitor [Version 1.0.0]</div><div class="line dim">Conexión local establecida. Sesión sin audio.</div><div class="line"></div><div class="line">Pulsa ESPACIO para ejecutar una operación.</div><div class="line">Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Cuanto más rápido, más crédito. Si te adelantas, se cancela.</div><div class="line">A veces aparece un checksum: escríbelo rápido para un bonus mayor.</div><div class="line">Tras cada captura puedes apostar el crédito en la ruleta: rojo, negro o verde.</div><div class="line">Los registros nuevos dan crédito extra. [u] abre la tienda de módulos.</div><div class="line"></div><div class="line dim">[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver</div><div class="line dim">decode expande los identificadores; encode restaura el formato compacto.</div><div class="line"></div></div>
       <div id="log" role="log" aria-label="Registro de operaciones" aria-live="polite" aria-relevant="additions"></div>
       <div class="session" id="session">
         <div id="metrics" class="session-line dim">local  /  428 cr  /  16 ops  /  index 5/24  /  chain 15</div>
@@ -114,7 +114,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     <button class="mobile-action" id="touch-action" data-action="poll">[ ejecutar ]</button>
     <button class="desktop-action" data-action="poll"><span class="key">[espacio]</span> ejecutar</button>
     <button data-action="catalog"><span class="key">[c]</span> registro</button>
-    <button data-action="upgrade"><span class="key">[u]</span> mejorar</button>
+    <button data-action="upgrade"><span class="key">[u]</span> tienda</button>
     <button data-action="help"><span class="key">[tab]</span> comandos</button>
     <button data-action="hide"><span class="key">[esc]</span> ocultar</button>
     <span class="local" id="save-status">sesión local</span>
@@ -124,15 +124,15 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
 /* Session Monitor — dependency-free, offline-capable terminal game. */
 (() => {
   'use strict';
-  const VERSION = 1;
-  const SAVE_KEY = 'session-monitor.save.v1';
-  const BACKUP_KEY = 'session-monitor.backup.v1';
+  const VERSION = 2;
+  const SAVE_KEY = 'session-monitor.save.v2';
+  const BACKUP_KEY = 'session-monitor.backup.v2';
   const MAX = 1e12;
   const NODES = [
-    {id:'local',name:'Estanque',need:0},
-    {id:'stream',name:'Río',need:12},
-    {id:'remote',name:'Costa',need:35},
-    {id:'deep',name:'Abismo',need:70}
+    {id:'local',name:'Estanque',need:0,cost:0},
+    {id:'stream',name:'Río',need:12,cost:150},
+    {id:'remote',name:'Costa',need:35,cost:500},
+    {id:'deep',name:'Abismo',need:70,cost:1500}
   ];
   const SPECIES = [
     ['L01','Alburno',0,0,8,.04,.18],['L02','Perca',0,0,12,.15,1.2],['L03','Carpa',0,1,23,1,6],['L04','Tenca',0,1,30,.4,3.5],['L05','Lucio',0,2,65,2,12],['L06','Carpa dorada',0,3,160,.5,4],
@@ -157,7 +157,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     {id:'hundred',label:'Lote de 100',decoded:'Cien capturas',reward:450,met:s=>s.caught>=100},
     {id:'all',label:'Índice íntegro',decoded:'Las 24 especies',reward:1500,met:s=>SPECIES.every(f=>s.collection[f.id])}
   ];
-  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],bestWeight:0,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
+  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],nodesUnlocked:[true,false,false,false],bestWeight:0,bestReactionMs:null,bestCipherMs:null,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
   function finite(n,min=0,max=MAX){return typeof n==='number'&&Number.isFinite(n)&&n>=min&&n<=max;}
   function validate(raw){
     if(!raw||typeof raw!=='object'||raw.version!==VERSION)throw Error('Versión de sesión no compatible.');
@@ -182,34 +182,40 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(!Array.isArray(raw.achievements)||raw.achievements.some(id=>!ACHIEVEMENTS.some(a=>a.id===id)))throw Error('Hitos no válidos.');
     if(Object.values(s.collection).reduce((a,c)=>a+c.count,0)!==s.caught||s.nodeCatches.reduce((a,n)=>a+n,0)!==s.caught||s.perfects>s.caught||s.streak>s.caught||s.bestStreak>s.caught||s.caught+s.missed>s.casts)throw Error('Los contadores de la sesión no coinciden.');
     s.achievements=[...new Set(raw.achievements)];s.decoded=raw.decoded===true;
+    s.bestReactionMs=finite(raw.bestReactionMs,0,60000)?raw.bestReactionMs:null;
+    s.bestCipherMs=finite(raw.bestCipherMs,0,60000)?raw.bestCipherMs:null;
+    s.nodesUnlocked=Array.isArray(raw.nodesUnlocked)&&raw.nodesUnlocked.length===4&&raw.nodesUnlocked.every(b=>typeof b==='boolean')?raw.nodesUnlocked.slice():s.nodeCatches.map((c,i)=>i===0||c>0);
+    s.nodesUnlocked[0]=true;
     return s;
   }
   function price(s,u){return Math.round(u.base*Math.pow(1.8,s.upgrades[u.id]));}
-  function timing(s,rng=Math.random){return {wait:Math.max(1000,(2100+rng()*2000)*Math.pow(.9,s.upgrades.speed)),window:2800+s.upgrades.buffer*400,perfect:850+s.upgrades.buffer*90};}
+  function timing(s,rng=Math.random){const perfect=550+s.upgrades.buffer*70;return {wait:Math.max(1000,(2100+rng()*2000)*Math.pow(.9,s.upgrades.speed)),window:2000+s.upgrades.buffer*300,perfect,instant:Math.round(perfect*.3)};}
   function chooseFish(s,rng=Math.random){
     const pool=SPECIES.filter(f=>f.node===s.node);
     const missing=pool.filter(f=>!s.collection[f.id]);
     // A bounded dry streak keeps the collection achievable without grinding forever.
     if(missing.length&&(s.nodeCatches[s.node]===0||s.nodeDry[s.node]>=10))return missing[Math.min(missing.length-1,Math.floor(rng()*missing.length))];
-    const weights=pool.map(f=>[37,20,8,3][f.tier]*(f.tier>=2?1+s.upgrades.luck*.2:1)*(!s.collection[f.id]?1.25+s.upgrades.luck*.09:1));
+    const weights=pool.map(f=>[37,20,8,3][f.tier]*(f.tier>=2?1+s.upgrades.luck*.2:1)*(!s.collection[f.id]?1.25+s.upgrades.luck*.09:1)*(f.value>300?2.5:1));
     let p=rng()*weights.reduce((a,b)=>a+b,0);
     for(let i=0;i<pool.length;i++){p-=weights[i];if(p<0)return pool[i];}
     return pool[pool.length-1];
   }
-  function rewardCatch(s,fish,perfect,rng=Math.random){
+  const TIER_FACTOR={instant:2,fast:1.5,'cipher-instant':2.5,'cipher-fast':1.8,'cipher-normal':1.3,normal:1};
+  function rewardCatch(s,fish,tier,rng=Math.random){
+    const factor=TIER_FACTOR[tier]||1;
     const weight=Math.round((fish.min+(fish.max-fish.min)*Math.pow(rng(),1.6))*1000)/1000;
     const previous=s.collection[fish.id];const isNew=!previous;const record=!!previous&&weight>previous.best;
     s.caught++;s.streak++;s.bestStreak=Math.max(s.bestStreak,s.streak);s.nodeCatches[s.node]++;s.nodeDry[s.node]=isNew?0:s.nodeDry[s.node]+1;
-    if(perfect)s.perfects++;
+    if(factor>1)s.perfects++;
     const multiplier=1+Math.min(s.streak-1,10)*.04;
-    const base=Math.round(fish.value*(.9+weight/fish.max*.35)*multiplier*(perfect?1.5:1));
+    const base=Math.round(fish.value*(.9+weight/fish.max*.35)*multiplier*factor);
     const discovery=isNew?fish.value:0;
     s.credits+=base+discovery;s.earned+=base+discovery;
     s.collection[fish.id]={count:(previous?.count||0)+1,best:Math.max(previous?.best||0,weight)};
     s.bestWeight=Math.max(s.bestWeight,weight);
     const milestones=[];
     for(const a of ACHIEVEMENTS)if(!s.achievements.includes(a.id)&&a.met(s)){s.achievements.push(a.id);s.credits+=a.reward;s.earned+=a.reward;milestones.push(a);}
-    return {fish,weight,isNew,record,base,discovery,perfect,milestones,unlocks:NODES.filter(n=>n.need===s.caught)};
+    return {fish,weight,isNew,record,base,discovery,tier,factor,milestones,unlocks:NODES.filter(n=>n.need===s.caught)};
   }
   const Core={VERSION,NODES,SPECIES,UPGRADES,ACHIEVEMENTS,fresh,validate,price,timing,chooseFish,rewardCatch};
   // A separate engine export keeps persistence and progression verifiable without a browser.
@@ -226,17 +232,23 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       else{loadMessage='El guardado no se pudo leer. Se ha conservado el archivo original; usa import para recuperar una copia.';storageOK=false;}
     }}
   }catch{storageOK=false;loadMessage='Guardado local no disponible. Usa export antes de cerrar la sesión.';}
-  let phase='idle',castAt=0,biteAt=0,expiresAt=0,perfectUntil=0,pausedAt=0,hidden=false,view='logs',viewPausedAt=0;
-  let lastSignal='',catchPending=null;
+  let phase='idle',castAt=0,biteAt=0,expiresAt=0,perfectUntil=0,instantUntil=0,pausedAt=0,hidden=false,view='logs',viewPausedAt=0;
+  let lastSignal='',catchPending=null,cipherActive=false,cipherPhrase='',shopMessage='',shopMessageKind='dim',gambleStake=0;
   let history=[],historyPos=0,rows=[],lastResult='',saveTimer=null,resetUntil=0;
   let logCounter=0;
   // Ignore an accidental double tap right after casting.
   const EARLY_GRACE=300;
+  // Checksum events get their own, much longer deadline than a normal confirm.
+  const CIPHER_WINDOW=9000;
+  const CIPHER_WORDS=['acceso','conexion','enlace','paquete','sesion','usuario','servidor','proceso','sistema','terminal','protocolo','registro','memoria','archivo','consulta','cifrado','token','backup','cache','puerto','buffer','entrada','salida','comando'];
+  // Real European roulette odds: 18 red, 18 black, 1 green (0) out of 37.
+  const REDS=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  const GAMBLE_PAYOUT={rojo:2,negro:2,verde:36};
   const fmt=n=>Math.round(n).toLocaleString('es-ES');
   const kg=n=>n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:3});
   const code=f=>state.decoded?f.name:f.id;
   const nodeLabel=i=>state.decoded?NODES[i].name:NODES[i].id;
-  const isBusy=()=>phase==='waiting'||phase==='bite';
+  const isBusy=()=>phase==='waiting'||phase==='bite'||phase==='gamble'||phase==='spin';
   const scrollDown=()=>requestAnimationFrame(()=>{terminal.scrollTop=terminal.scrollHeight;});
   function clock(){return new Date().toLocaleTimeString('es-ES',{hour12:false});}
   function line(text,kind='normal'){
@@ -275,7 +287,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   function tick(){
     if(hidden||locked||view!=='logs')return;
     const t=performance.now();
-    if(phase==='waiting'&&t>=biteAt){phase='bite';setSignal('RESPONSE_READY  ·  [ESPACIO] confirmar','active bite');$('hint').textContent='Confirmación rápida: +50% de crédito.';}
+    if(phase==='waiting'&&t>=biteAt){
+      phase='bite';
+      if(cipherActive){setSignal('CHECKSUM READY  ·  escribe '+cipherPhrase,'active bite');input.focus({preventScroll:true});}
+      else setSignal('RESPONSE_READY  ·  [ESPACIO] confirmar','active bite');
+    }
     if(phase==='bite'&&t>expiresAt){miss();return;}
     if(phase==='waiting'){
       const dots='.'.repeat(1+Math.floor(t/550)%3);
@@ -283,46 +299,106 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     }
     if(phase==='bite'){
       const left=Math.max(0,(expiresAt-t)/1000).toFixed(1);
-      $('hint').textContent=`timeout ${left}s${t<=perfectUntil?'  /  perfect window':'  /  confirma ahora'}`;
+      if(cipherActive)$('hint').textContent=`timeout ${left}s  ·  escribe "${cipherPhrase}" para confirmar (espacio no vale)`;
+      else{
+        const tierHint=t<=instantUntil?'  /  instant window (x2)':t<=perfectUntil?'  /  fast window (x1.5)':'  /  confirma ahora';
+        $('hint').textContent=`timeout ${left}s${tierHint}`;
+      }
     }
   }
   function idleSignal(){
     metrics();
     if(locked){setSignal('SESSION_LOCKED  ·  sesión activa en otra pestaña');$('hint').textContent='Vuelve a esa pestaña o cierra la otra y recarga esta.';return;}
+    if(phase==='gamble'){setSignal('STAKE READY  ·  [r/n/v] apostar','active');$('hint').textContent=`¿Apostar ${fmt(gambleStake)} cr en la ruleta? [r] rojo ×2  [n] negro ×2  [v] verde ×36  ·  [ESPACIO] cobrar`;$('touch-action').textContent='[ cobrar ]';return;}
+    if(phase==='spin'){setSignal('SPINNING','active bite');$('touch-action').textContent='[ girando… ]';return;}
     setSignal('READY  ·  [ESPACIO] ejecutar');
     $('hint').textContent=lastResult||'Espera a RESPONSE_READY y vuelve a pulsar espacio.';
     $('touch-action').textContent='[ ejecutar ]';
   }
+  function makePhrase(){
+    return CIPHER_WORDS[Math.floor(Math.random()*CIPHER_WORDS.length)];
+  }
   function action(){
     if(hidden||locked)return false;
     if(view!=='logs'){showView('logs');return true;}
+    if(phase==='spin')return false;
+    if(phase==='gamble'){skipGamble();return true;}
     const t=performance.now();
     if(phase==='idle'){
-      const timingData=timing(state);state.casts++;catchPending=chooseFish(state);phase='waiting';castAt=t;biteAt=t+timingData.wait;expiresAt=biteAt+timingData.window;perfectUntil=biteAt+timingData.perfect;
+      const timingData=timing(state);state.casts++;catchPending=chooseFish(state);phase='waiting';castAt=t;biteAt=t+timingData.wait;expiresAt=biteAt+timingData.window;perfectUntil=biteAt+timingData.perfect;instantUntil=biteAt+timingData.instant;
+      cipherActive=Math.random()<(.1+state.upgrades.luck*.015);cipherPhrase=cipherActive?makePhrase():'';
+      if(cipherActive)expiresAt=biteAt+CIPHER_WINDOW;
       lastResult='';addLog('> poll --node '+NODES[state.node].id,'dim');$('hint').textContent='Espera a RESPONSE_READY. Si te adelantas, se cancela.';$('touch-action').textContent='[ esperando respuesta… ]';save();tick();return true;
     }
     if(phase==='waiting'&&t<biteAt){if(t-castAt>=EARLY_GRACE)miss(true);return false;}
     if(t>expiresAt){miss();return false;}
-    const result=rewardCatch(state,catchPending,t<=perfectUntil);phase='idle';catchPending=null;
-    const suffix=[result.perfect?'PERFECT':null,result.isNew?'NEW':result.record?'RECORD':null].filter(Boolean).join(' / ');
-    addLog(`200 OK  ${code(result.fish)}  ${state.decoded?kg(result.weight)+' kg':'payload '+kg(result.weight)+' MB'}  +${fmt(result.base+result.discovery)} cr${suffix?'  ['+suffix+']':''}`,result.fish.tier>=2?'bright':'normal');
+    if(cipherActive)return false;
+    finishCatch(t<=instantUntil?'instant':t<=perfectUntil?'fast':'normal',t-biteAt);return true;
+  }
+  function finishCatch(tier,elapsed){
+    const result=rewardCatch(state,catchPending,tier);phase='idle';catchPending=null;cipherActive=false;cipherPhrase='';
+    if(elapsed!=null&&elapsed>=0){
+      if(tier.startsWith('cipher')){if(state.bestCipherMs==null||elapsed<state.bestCipherMs)state.bestCipherMs=Math.round(elapsed);}
+      else if(state.bestReactionMs==null||elapsed<state.bestReactionMs)state.bestReactionMs=Math.round(elapsed);
+    }
+    const tierLabel={instant:'INSTANT x2',fast:'PERFECT x1.5','cipher-instant':'CHECKSUM x2.5','cipher-fast':'CHECKSUM x1.8','cipher-normal':'CHECKSUM x1.3'}[tier]||null;
+    const suffix=[tierLabel,result.isNew?'NEW':result.record?'RECORD':null].filter(Boolean).join(' / ');
+    const earnedTotal=result.base+result.discovery;
+    addLog(`200 OK  ${code(result.fish)}  ${state.decoded?kg(result.weight)+' kg':'payload '+kg(result.weight)+' MB'}  +${fmt(earnedTotal)} cr  ${(Math.max(0,elapsed||0)/1000).toFixed(2)}s${suffix?'  ['+suffix+']':''}`,result.fish.tier>=2||result.factor>1?'bright':'normal');
+    if(earnedTotal>350)addLog(state.decoded?`¡CAPTURA ENORME! ${fmt(earnedTotal)} cr de un tirón.`:`ALERT: payload de alto valor  ·  ${fmt(earnedTotal)} cr procesados`,'bright');
     for(const m of result.milestones)addLog(`checkpoint: ${state.decoded?m.decoded:m.label}  +${fmt(m.reward)} cr`,'bright');
     for(const n of result.unlocks)addLog(`node ${n.id} disponible  ·  tecla ${NODES.indexOf(n)+1}`,'bright');
     if(result.milestones.some(m=>m.id==='all'))addLog('INDEX COMPLETE  ·  24/24. Sesión completada. Puedes seguir batiendo récords.','bright');
-    lastResult=result.isNew?'Nuevo registro añadido al índice. [c] consultar':'Operación completada. [ESPACIO] siguiente';
-    save();idleSignal();scrollDown();return true;
+    phase='gamble';gambleStake=earnedTotal;
+    save();idleSignal();scrollDown();
+  }
+  function stakeGamble(color){
+    if(phase!=='gamble'||hidden||locked)return false;
+    const stake=gambleStake;
+    state.credits-=stake;phase='spin';
+    addLog(`> stake ${fmt(stake)} cr  →  ${color}`,'dim');
+    idleSignal();
+    let ticks=0;
+    const spinTimer=setInterval(()=>{
+      ticks++;
+      if(!hidden&&view==='logs')$('hint').textContent=`girando...  ${Math.floor(Math.random()*37)}`;
+      if(ticks>=9){clearInterval(spinTimer);resolveSpin(color,stake);}
+    },140);
+    save();
+    return true;
+  }
+  function resolveSpin(color,stake){
+    const n=Math.floor(Math.random()*37);
+    const result=n===0?'verde':REDS.has(n)?'rojo':'negro';
+    const win=result===color;
+    if(win){
+      const amount=stake*GAMBLE_PAYOUT[color];
+      state.credits+=amount;state.earned+=amount;
+      addLog(`ruleta: ${n} ${result.toUpperCase()}  ·  GANASTE  +${fmt(amount)} cr`,'bright');
+      lastResult='¡Racha de suerte! [ESPACIO] siguiente';
+    }else{
+      addLog(`ruleta: ${n} ${result.toUpperCase()}  ·  perdiste ${fmt(stake)} cr`);
+      lastResult='Sigue intentándolo. [ESPACIO] siguiente';
+    }
+    phase='idle';gambleStake=0;
+    save();idleSignal();scrollDown();
+  }
+  function skipGamble(){
+    addLog(`cobrado: ${fmt(gambleStake)} cr guardados.`,'dim');
+    phase='idle';gambleStake=0;lastResult='Operación completada. [ESPACIO] siguiente';
+    save();idleSignal();scrollDown();
   }
   function miss(early=false){
-    phase='idle';catchPending=null;state.missed++;state.streak=0;lastResult=early?'Demasiado pronto: espera a RESPONSE_READY. [ESPACIO] reintentar':'Sin penalización de crédito. [ESPACIO] reintentar';addLog(early?'499 CLIENT CLOSED REQUEST  ·  Confirmación antes de la respuesta.':'408 TIMEOUT  ·  La respuesta ha caducado.');save();idleSignal();
+    phase='idle';catchPending=null;cipherActive=false;cipherPhrase='';state.missed++;state.streak=0;lastResult=early?'Demasiado pronto: espera a RESPONSE_READY. [ESPACIO] reintentar':'Sin penalización de crédito. [ESPACIO] reintentar';addLog(early?'499 CLIENT CLOSED REQUEST  ·  Confirmación antes de la respuesta.':'408 TIMEOUT  ·  La respuesta ha caducado.');save();idleSignal();
   }
   function pauseForView(){if(isBusy()&&!viewPausedAt)viewPausedAt=performance.now();}
-  function resumeFromView(){if(viewPausedAt){const d=performance.now()-viewPausedAt;biteAt+=d;expiresAt+=d;perfectUntil+=d;viewPausedAt=0;}}
+  function resumeFromView(){if(viewPausedAt){const d=performance.now()-viewPausedAt;biteAt+=d;expiresAt+=d;perfectUntil+=d;instantUntil+=d;viewPausedAt=0;}}
   function showView(next){
     if(hidden)return;
     if(next!=='logs')pauseForView();else resumeFromView();
     view=next;output.replaceChildren();log.hidden=next!=='logs';$('session').hidden=next!=='logs';
     if(next==='logs'){
-      if(!rows.length){line('Session Monitor [Version 1.0.0]','bright');line('Conexión local establecida. Sesión sin audio.','dim');blank();line('Pulsa ESPACIO para ejecutar una operación.');line('Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Si te adelantas, se cancela.');line('Los registros nuevos dan crédito extra. [u] mejora automáticamente.');blank();line('[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver','dim');line('decode expande los identificadores; encode restaura el formato compacto.','dim');blank();if(loadMessage){line(loadMessage);blank();}}
+      if(!rows.length){line('Session Monitor [Version 1.0.0]','bright');line('Conexión local establecida. Sesión sin audio.','dim');blank();line('Pulsa ESPACIO para ejecutar una operación.');line('Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Cuanto más rápido, más crédito. Si te adelantas, se cancela.');line('A veces aparece un checksum: escríbelo rápido para un bonus mayor.');line('Tras cada captura puedes apostar el crédito en la ruleta: rojo, negro o verde.');line('Los registros nuevos dan crédito extra. [u] abre la tienda de módulos.');blank();line('[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver','dim');line('decode expande los identificadores; encode restaura el formato compacto.','dim');blank();if(loadMessage){line(loadMessage);blank();}}
       renderLogs();if(!isBusy())idleSignal();else tick();
     }else if(next==='help')renderHelp();
     else if(next==='catalog')renderCatalog();
@@ -337,7 +413,10 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     line('session-monitor / comandos','bright');blank();
     const entries=[
       ['ESPACIO','Ejecutar. Esperar. Confirmar cuando llegue la respuesta; si te adelantas, se cancela.'],
-      ['c / catalog','Abrir el índice de registros.'],['u / upgrade','Comprar la mejora más barata disponible.'],['shop','Ver módulos y precios; upgrade speed|buffer|luck.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones.'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
+      ['timing','Confirmar justo al llegar RESPONSE_READY da bonus: instantáneo x2, rápido x1.5.'],
+      ['checksum','A veces aparece un checksum al llegar la respuesta: tienes que escribirlo para confirmar (espacio no vale esta vez), y cuanto más rápido, más bonus, hasta x2.5.'],
+      ['r / n / v','Tras cada captura: apostar el crédito ganado a rojo, negro o verde en la ruleta (18/18/1 sobre 37, probabilidades reales). [ESPACIO] cobra sin apostar.'],
+      ['c / catalog','Abrir el índice de registros.'],['u / shop','Abrir la tienda de módulos; pulsa 1–3 para instalar, o escribe upgrade speed|buffer|luck.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez). (En la tienda, 1–3 instala módulos.)'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
     ];
     for(const [cmd,desc] of entries){line(cmd,'bright');line('  '+desc);}
     blank();line('Los menús pausan la operación. Cambiar de pestaña también oculta y pausa.','dim');line('Guardado automático en este navegador. Sin conexión entre dispositivos.','dim');line('↑ ↓ historial · Tab completa comandos escritos · Enter ejecuta','dim');
@@ -355,35 +434,60 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     line(state.decoded?'encode para volver a mostrar códigos.':'decode para expandir los identificadores.','dim');
   }
   function renderShop(){
-    line(`modules / ${fmt(state.credits)} cr disponibles`,'bright');blank();
-    for(const u of UPGRADES){const level=state.upgrades[u.id],cost=price(state,u);line(`${u.label}${state.decoded?' / '+u.decoded:''}  v${level}/${u.max}`,'bright');line('  '+u.description);line(level===u.max?'  MAX LEVEL':`  ${fmt(cost)} cr  ·  upgrade ${u.id}${state.credits<cost?'  (faltan '+fmt(cost-state.credits)+' cr)':''}`);blank();}
-    line('Pulsa [u] para instalar la mejora más barata.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03 y registros nuevos','dim');
+    line(`modules / ${fmt(state.credits)} cr disponibles`,'bright');
+    if(shopMessage){line(shopMessage,shopMessageKind);shopMessage='';shopMessageKind='dim';}
+    blank();
+    UPGRADES.forEach((u,i)=>{
+      const level=state.upgrades[u.id],cost=price(state,u),maxed=level===u.max;
+      line(`[${i+1}] ${u.label}${state.decoded?' / '+u.decoded:''}  v${level}/${u.max}`,'bright');
+      line('  '+u.description);
+      const row=document.createElement('div');row.className='line';
+      if(maxed)row.textContent='  MAX LEVEL';
+      else{
+        const btn=document.createElement('button');btn.className='row-action';
+        btn.textContent=`  ${fmt(cost)} cr  ·  instalar [${i+1}]`+(state.credits<cost?'  (faltan '+fmt(cost-state.credits)+' cr)':'');
+        btn.addEventListener('click',()=>upgrade(u.id));
+        row.append(btn);
+      }
+      output.append(row);blank();
+    });
+    line('Pulsa 1–3 para instalar, o escribe upgrade speed|buffer|luck.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
   }
   function upgrade(id){
     if(hidden||locked)return false;
     if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de instalar módulos.');if(view!=='logs')showView('logs');return false;}
-    let u=id?UPGRADES.find(u=>u.id===id||u.label===id):UPGRADES.filter(u=>state.upgrades[u.id]<u.max).sort((a,b)=>price(state,a)-price(state,b))[0];
-    if(!u){addLog(id?'Módulo no encontrado. Usa shop.':'Todos los módulos están al máximo.');if(view!=='logs')showView('logs');return false;}
-    if(state.upgrades[u.id]===u.max){addLog(u.label+': nivel máximo.');if(view!=='logs')showView('logs');return false;}
+    const u=UPGRADES.find(x=>x.id===id||x.label===id);
+    if(!u){addLog('Módulo no encontrado. Usa shop.');if(view!=='logs')showView('logs');return false;}
+    if(state.upgrades[u.id]===u.max){const msg=u.label+': nivel máximo.';addLog(msg);shopMessage=msg;showView('shop');return false;}
     const cost=price(state,u);
-    if(state.credits<cost){addLog(`${u.label}: necesitas ${fmt(cost)} cr. Faltan ${fmt(cost-state.credits)} cr.`);if(view!=='logs')showView('logs');return false;}
-    state.credits-=cost;state.upgrades[u.id]++;addLog(`module installed: ${u.label} v${state.upgrades[u.id]}  −${fmt(cost)} cr`,'bright');save();showView('logs');return true;
+    if(state.credits<cost){const msg=`${u.label}: necesitas ${fmt(cost)} cr. Faltan ${fmt(cost-state.credits)} cr.`;addLog(msg);shopMessage=msg;showView('shop');return false;}
+    state.credits-=cost;state.upgrades[u.id]++;const msg=`module installed: ${u.label} v${state.upgrades[u.id]}  −${fmt(cost)} cr`;addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();showView('shop');return true;
   }
   function renderNodes(){
     line('nodes / destinos disponibles','bright');blank();
-    NODES.forEach((node,i)=>{line(`[${i+1}] ${nodeLabel(i)}${state.node===i?'  < active':''}`,'bright');line('    '+(state.caught>=node.need?'ONLINE · tecla '+(i+1):'LOCKED · '+node.need+' operaciones ('+state.caught+'/'+node.need+')'));});
+    NODES.forEach((node,i)=>{
+      line(`[${i+1}] ${nodeLabel(i)}${state.node===i?'  < active':''}`,'bright');
+      if(state.caught<node.need)line('    LOCKED · '+node.need+' operaciones ('+state.caught+'/'+node.need+')');
+      else if(!state.nodesUnlocked[i])line(`    DISPONIBLE · desbloqueo ${fmt(node.cost)} cr${state.credits<node.cost?'  (faltan '+fmt(node.cost-state.credits)+' cr)':''}  ·  tecla ${i+1}`);
+      else line('    ONLINE · tecla '+(i+1));
+    });
   }
   function switchNode(index){
     if(hidden||locked)return false;
     if(!Number.isInteger(index)||index<0||index>3){addLog('Nodo no válido. Usa nodes.');return false;}
     if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de cambiar de nodo.');if(view!=='logs')showView('logs');return false;}
-    if(state.caught<NODES[index].need){addLog(`node ${NODES[index].id}: faltan ${NODES[index].need-state.caught} operaciones.`);showView('logs');return false;}
+    const node=NODES[index];
+    if(state.caught<node.need){addLog(`node ${node.id}: faltan ${node.need-state.caught} operaciones.`);showView('logs');return false;}
+    if(!state.nodesUnlocked[index]){
+      if(state.credits<node.cost){addLog(`node ${node.id}: desbloqueo cuesta ${fmt(node.cost)} cr. Faltan ${fmt(node.cost-state.credits)} cr.`);showView('logs');return false;}
+      state.credits-=node.cost;state.nodesUnlocked[index]=true;addLog(`node ${node.id}: desbloqueado  −${fmt(node.cost)} cr`,'bright');
+    }
     state.node=index;lastResult='Conexión establecida. [ESPACIO] ejecutar';addLog('connected: '+nodeLabel(index),'bright');save();showView('logs');return true;
   }
   function renderStats(){
     line('session / status','bright');blank();
     for(const [key,val] of [
-      ['Crédito disponible',fmt(state.credits)+' cr'],['Crédito total obtenido',fmt(state.earned)+' cr'],['Operaciones completadas',state.caught],['Solicitudes enviadas',state.casts],['Operaciones fallidas',state.missed],['Confirmaciones perfectas',state.perfects],['Racha actual / mejor',state.streak+' / '+state.bestStreak],['Registros descubiertos',Object.keys(state.collection).length+' / 24'],['Mayor '+(state.decoded?'peso':'payload'),kg(state.bestWeight)+(state.decoded?' kg':' MB')],['Hitos completados',state.achievements.length+' / '+ACHIEVEMENTS.length],['Nodo activo',nodeLabel(state.node)],['Guardado',storageOK?'automático · solo este navegador':'no disponible · usa export']
+      ['Crédito disponible',fmt(state.credits)+' cr'],['Crédito total obtenido',fmt(state.earned)+' cr'],['Operaciones completadas',state.caught],['Solicitudes enviadas',state.casts],['Operaciones fallidas',state.missed],['Confirmaciones perfectas',state.perfects],['Mejor reacción',state.bestReactionMs!=null?(state.bestReactionMs/1000).toFixed(2)+'s':'—'],['Mejor checksum',state.bestCipherMs!=null?(state.bestCipherMs/1000).toFixed(2)+'s':'—'],['Racha actual / mejor',state.streak+' / '+state.bestStreak],['Registros descubiertos',Object.keys(state.collection).length+' / 24'],['Mayor '+(state.decoded?'peso':'payload'),kg(state.bestWeight)+(state.decoded?' kg':' MB')],['Hitos completados',state.achievements.length+' / '+ACHIEVEMENTS.length],['Nodo activo',nodeLabel(state.node)],['Guardado',storageOK?'automático · solo este navegador':'no disponible · usa export']
     ])line(key+': '+val);
   }
   function renderAchievements(){
@@ -395,7 +499,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     terminal.scrollTop=0;
   }
   function reveal(){
-    if(!hidden)return;const dt=performance.now()-pausedAt;if(isBusy()&&!viewPausedAt){biteAt+=dt;expiresAt+=dt;perfectUntil+=dt;}
+    if(!hidden)return;const dt=performance.now()-pausedAt;if(isBusy()&&!viewPausedAt){biteAt+=dt;expiresAt+=dt;perfectUntil+=dt;instantUntil+=dt;}
     hidden=false;app.classList.remove('cloaked');$('game').hidden=false;$('boot').hidden=false;input.value='';try{sessionStorage.removeItem('session-monitor.hidden');}catch{}showView(view);scrollDown();
   }
   function clean(){
@@ -429,12 +533,16 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(['help','ayuda','?'].includes(cmd)){showView('help');return true;}
     if(['catalog','collection','index','c'].includes(cmd)){showView('catalog');return true;}
     if(['shop','modules'].includes(cmd)){showView('shop');return true;}
-    if(['upgrade','u'].includes(cmd))return upgrade(args[0]);
+    if(['upgrade','u'].includes(cmd)){if(args[0])return upgrade(args[0]);showView('shop');return true;}
+    if(['r','rojo','red'].includes(cmd)&&phase==='gamble')return stakeGamble('rojo');
+    if(['n','negro','black'].includes(cmd)&&phase==='gamble')return stakeGamble('negro');
+    if(['v','verde','green'].includes(cmd)&&phase==='gamble')return stakeGamble('verde');
+    if(cmd==='cobrar'&&phase==='gamble'){skipGamble();return true;}
     if(['status','stats','s'].includes(cmd)){showView('stats');return true;}
     if(['goals','achievements'].includes(cmd)){showView('achievements');return true;}
     if(['nodes','map'].includes(cmd)){showView('nodes');return true;}
     if(['node','connect'].includes(cmd)){const n=NODES.findIndex(n=>n.id===args[0]);return switchNode(n>=0?n:Number(args[0])-1);}
-    if(/^[1-4]$/.test(cmd))return switchNode(Number(cmd)-1);
+    if(/^[1-4]$/.test(cmd)){if(view==='shop'){const u=UPGRADES[Number(cmd)-1];return u?upgrade(u.id):false;}return switchNode(Number(cmd)-1);}
     if(['decode','encode'].includes(cmd)){state.decoded=cmd==='decode';rows=[];addLog('output format: '+(state.decoded?'expanded':'compact'),'dim');save();showView(view);return true;}
     if(['clear','cls'].includes(cmd)){clean();return true;}
     if(['pause','exit','hide'].includes(cmd)){cloak();return true;}
@@ -450,6 +558,12 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     addLog('Comando no reconocido: '+trimmed+'. Usa help.');showView('logs');return false;
   }
   $('command-form').addEventListener('submit',e=>{e.preventDefault();if(hidden){input.value='';return;}if(input.value.trim())execute(input.value);else action();});
+  input.addEventListener('input',()=>{
+    if(phase==='bite'&&cipherActive&&view==='logs'&&input.value===cipherPhrase){
+      const elapsed=performance.now()-biteAt;input.value='';
+      finishCatch(elapsed<2500?'cipher-instant':elapsed<4500?'cipher-fast':'cipher-normal',elapsed);
+    }
+  });
   const completions=['poll','catalog','upgrade','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();hidden?reveal():cloak();input.blur();return;}
@@ -469,15 +583,16 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(e.code==='Space'){e.preventDefault();action();return;}
     if(e.target instanceof HTMLButtonElement)return;
     if(e.key==='c'){e.preventDefault();showView(view==='catalog'?'logs':'catalog');return;}
-    if(e.key==='u'){e.preventDefault();upgrade();return;}
+    if(e.key==='u'){e.preventDefault();showView(view==='shop'?'logs':'shop');return;}
     if(e.key==='s'){e.preventDefault();showView(view==='stats'?'logs':'stats');return;}
-    if(/^[1-4]$/.test(e.key)){e.preventDefault();switchNode(Number(e.key)-1);return;}
+    if(phase==='gamble'&&/^[rnv]$/.test(e.key)){e.preventDefault();stakeGamble(e.key==='r'?'rojo':e.key==='n'?'negro':'verde');return;}
+    if(/^[1-4]$/.test(e.key)){e.preventDefault();if(view==='shop'){const u=UPGRADES[Number(e.key)-1];if(u)upgrade(u.id);return;}switchNode(Number(e.key)-1);return;}
     if(e.key==='?'||e.key==='F1'){e.preventDefault();showView('help');return;}
     if(e.key.length===1){input.focus();}
   });
   document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',()=>{
     const a=btn.dataset.action;if(hidden&&a!=='fullscreen'){if(a==='hide')reveal();btn.blur();return;}
-    if(a==='poll')action();else if(a==='hide')cloak();else if(a==='catalog')showView(view==='catalog'?'logs':'catalog');else if(a==='help')showView(view==='help'?'logs':'help');else if(a==='upgrade')upgrade();else if(a==='fullscreen')void fullscreen();else if(a==='new')clean();btn.blur();
+    if(a==='poll')action();else if(a==='hide')cloak();else if(a==='catalog')showView(view==='catalog'?'logs':'catalog');else if(a==='help')showView(view==='help'?'logs':'help');else if(a==='upgrade')showView(view==='shop'?'logs':'shop');else if(a==='fullscreen')void fullscreen();else if(a==='new')clean();btn.blur();
   }));
   terminal.addEventListener('click',e=>{if(!window.getSelection()?.toString()&&!(e.target instanceof HTMLButtonElement))input.focus({preventScroll:true});});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)cloak();});
@@ -497,7 +612,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   showView('logs');
   if(!storageOK)$('save-status').textContent='export para guardar';
   try{if(sessionStorage.getItem('session-monitor.hidden')==='1')cloak();}catch{}
-  setInterval(()=>{tick();if(!hidden&&phase==='bite')$('touch-action').textContent='[ confirmar respuesta ]';},80);
+  setInterval(()=>{tick();if(!hidden&&phase==='bite')$('touch-action').textContent=cipherActive?'[ escribe el checksum ]':'[ confirmar respuesta ]';},80);
   // Structured actions share the exact state transitions used by keyboard and touch.
   const context=document.modelContext;
   if(context?.registerTool){
