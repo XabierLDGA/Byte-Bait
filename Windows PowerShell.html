@@ -286,7 +286,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     }catch{storageOK=false;$('save-status').textContent='export para guardar';addLog('WARN save: almacenamiento no disponible. Usa export para guardar.');return false;}
   }
   function metrics(){
-    $('metrics').textContent=`${nodeLabel(state.node)}  /  ${fmt(state.credits)} cr  /  ${state.caught} ops  /  index ${Object.keys(state.collection).length}/24${state.streak>1?'  /  chain '+state.streak:''}`;
+    $('metrics').textContent=`${nodeLabel(state.node)}  /  ${fmt(state.credits)} cr  /  ${state.caught} ops  /  index ${Object.keys(state.collection).length}/24${state.streak>1?'  /  chain '+state.streak:''}  /  cebo ${state.items.golden}/${GOLDEN_MAX}${state.goldenPending?' (equipado)':''}`;
   }
   function setSignal(text,kind=''){
     if(text!==lastSignal){$('signal').textContent=text;lastSignal=text;}
