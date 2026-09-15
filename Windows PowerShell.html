@@ -146,6 +146,10 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     {id:'buffer',label:'buffer',decoded:'Sedal',base:45,description:'Más tiempo para recoger',max:6},
     {id:'luck',label:'decoder',decoded:'Cebo',base:70,description:'Más registros raros y nuevos',max:8}
   ];
+  const CONSUMABLES = [
+    {id:'golden',label:'cebo dorado',decoded:'Cebo dorado',cost:200,description:'La próxima operación es de prioridad alta (registro raro o legendario garantizado).'},
+    {id:'purge',label:'purga',decoded:'Purga de racha seca',cost:120,description:'La próxima operación en este nodo prioriza un registro nuevo, si queda alguno.'}
+  ];
   const ACHIEVEMENTS = [
     {id:'first',label:'Primer paquete',decoded:'Primera captura',reward:25,met:s=>s.caught>=1},
     {id:'ten',label:'Lote de 10',decoded:'Diez capturas',reward:80,met:s=>s.caught>=10},
@@ -157,7 +161,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     {id:'hundred',label:'Lote de 100',decoded:'Cien capturas',reward:450,met:s=>s.caught>=100},
     {id:'all',label:'Índice íntegro',decoded:'Las 24 especies',reward:1500,met:s=>SPECIES.every(f=>s.collection[f.id])}
   ];
-  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],nodesUnlocked:[true,false,false,false],bestWeight:0,bestReactionMs:null,bestCipherMs:null,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
+  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],nodesUnlocked:[true,false,false,false],goldenPending:false,bestWeight:0,bestReactionMs:null,bestCipherMs:null,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
   function finite(n,min=0,max=MAX){return typeof n==='number'&&Number.isFinite(n)&&n>=min&&n<=max;}
   function validate(raw){
     if(!raw||typeof raw!=='object'||raw.version!==VERSION)throw Error('Versión de sesión no compatible.');
@@ -186,12 +190,14 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     s.bestCipherMs=finite(raw.bestCipherMs,0,60000)?raw.bestCipherMs:null;
     s.nodesUnlocked=Array.isArray(raw.nodesUnlocked)&&raw.nodesUnlocked.length===4&&raw.nodesUnlocked.every(b=>typeof b==='boolean')?raw.nodesUnlocked.slice():s.nodeCatches.map((c,i)=>i===0||c>0);
     s.nodesUnlocked[0]=true;
+    s.goldenPending=raw.goldenPending===true;
     return s;
   }
   function price(s,u){return Math.round(u.base*Math.pow(1.8,s.upgrades[u.id]));}
   function timing(s,rng=Math.random){const perfect=550+s.upgrades.buffer*70;return {wait:Math.max(1000,(2100+rng()*2000)*Math.pow(.9,s.upgrades.speed)),window:2000+s.upgrades.buffer*300,perfect,instant:Math.round(perfect*.3)};}
-  function chooseFish(s,rng=Math.random){
-    const pool=SPECIES.filter(f=>f.node===s.node);
+  function chooseFish(s,rng=Math.random,opts={}){
+    let pool=SPECIES.filter(f=>f.node===s.node);
+    if(opts.forceRare){const rare=pool.filter(f=>f.tier>=2);if(rare.length)pool=rare;}
     const missing=pool.filter(f=>!s.collection[f.id]);
     // A bounded dry streak keeps the collection achievable without grinding forever.
     if(missing.length&&(s.nodeCatches[s.node]===0||s.nodeDry[s.node]>=10))return missing[Math.min(missing.length-1,Math.floor(rng()*missing.length))];
@@ -312,7 +318,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(phase==='gamble'){setSignal('STAKE READY  ·  [r/n/v] apostar','active');$('hint').textContent=`¿Apostar ${fmt(gambleStake)} cr en la ruleta? [r] rojo ×2  [n] negro ×2  [v] verde ×36  ·  [ESPACIO] cobrar`;$('touch-action').textContent='[ cobrar ]';return;}
     if(phase==='spin'){setSignal('SPINNING','active bite');$('touch-action').textContent='[ girando… ]';return;}
     setSignal('READY  ·  [ESPACIO] ejecutar');
-    $('hint').textContent=lastResult||'Espera a RESPONSE_READY y vuelve a pulsar espacio.';
+    $('hint').textContent=(lastResult||'Espera a RESPONSE_READY y vuelve a pulsar espacio.')+(state.goldenPending?'  ·  cebo dorado activo':'');
     $('touch-action').textContent='[ ejecutar ]';
   }
   function makePhrase(){
@@ -325,10 +331,15 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(phase==='gamble'){skipGamble();return true;}
     const t=performance.now();
     if(phase==='idle'){
-      const timingData=timing(state);state.casts++;catchPending=chooseFish(state);phase='waiting';castAt=t;biteAt=t+timingData.wait;expiresAt=biteAt+timingData.window;perfectUntil=biteAt+timingData.perfect;instantUntil=biteAt+timingData.instant;
+      const timingData=timing(state);state.casts++;
+      const forceRare=state.goldenPending;
+      catchPending=chooseFish(state,Math.random,{forceRare});
+      phase='waiting';castAt=t;biteAt=t+timingData.wait;expiresAt=biteAt+timingData.window;perfectUntil=biteAt+timingData.perfect;instantUntil=biteAt+timingData.instant;
       cipherActive=Math.random()<(.1+state.upgrades.luck*.015);cipherPhrase=cipherActive?makePhrase():'';
       if(cipherActive)expiresAt=biteAt+CIPHER_WINDOW;
-      lastResult='';addLog('> poll --node '+NODES[state.node].id,'dim');$('hint').textContent='Espera a RESPONSE_READY. Si te adelantas, se cancela.';$('touch-action').textContent='[ esperando respuesta… ]';save();tick();return true;
+      lastResult='';addLog('> poll --node '+NODES[state.node].id,'dim');
+      if(forceRare){state.goldenPending=false;addLog('cebo dorado consumido: prioridad alta en esta operación','bright');}
+      $('hint').textContent='Espera a RESPONSE_READY. Si te adelantas, se cancela.';$('touch-action').textContent='[ esperando respuesta… ]';save();tick();return true;
     }
     if(phase==='waiting'&&t<biteAt){if(t-castAt>=EARLY_GRACE)miss(true);return false;}
     if(t>expiresAt){miss();return false;}
@@ -374,13 +385,13 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(win){
       const amount=stake*GAMBLE_PAYOUT[color];
       state.credits+=amount;state.earned+=amount;
-      addLog(`ruleta: ${n} ${result.toUpperCase()}  ·  GANASTE  +${fmt(amount)} cr`,'bright');
-      lastResult='¡Racha de suerte! [ESPACIO] siguiente';
+      addLog(`ruleta: ${n} ${result.toUpperCase()}  ·  GANASTE  +${fmt(amount)} cr  ·  [r/n/v] seguir o [ESPACIO] cobrar`,'bright');
+      phase='gamble';gambleStake=amount;
     }else{
       addLog(`ruleta: ${n} ${result.toUpperCase()}  ·  perdiste ${fmt(stake)} cr`);
       lastResult='Sigue intentándolo. [ESPACIO] siguiente';
+      phase='idle';gambleStake=0;
     }
-    phase='idle';gambleStake=0;
     save();idleSignal();scrollDown();
   }
   function skipGamble(){
@@ -415,8 +426,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       ['ESPACIO','Ejecutar. Esperar. Confirmar cuando llegue la respuesta; si te adelantas, se cancela.'],
       ['timing','Confirmar justo al llegar RESPONSE_READY da bonus: instantáneo x2, rápido x1.5.'],
       ['checksum','A veces aparece un checksum al llegar la respuesta: tienes que escribirlo para confirmar (espacio no vale esta vez), y cuanto más rápido, más bonus, hasta x2.5.'],
-      ['r / n / v','Tras cada captura: apostar el crédito ganado a rojo, negro o verde en la ruleta (18/18/1 sobre 37, probabilidades reales). [ESPACIO] cobra sin apostar.'],
-      ['c / catalog','Abrir el índice de registros.'],['u / shop','Abrir la tienda de módulos; pulsa 1–3 para instalar, o escribe upgrade speed|buffer|luck.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez). (En la tienda, 1–3 instala módulos.)'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
+      ['r / n / v','Tras una captura (o tras ganar): apostar el crédito a rojo, negro o verde (18/18/1 sobre 37, probabilidades reales). Puedes encadenar apuestas tras ganar, o [ESPACIO] para cobrar y parar.'],
+      ['c / catalog','Abrir el índice de registros.'],['u / shop','Abrir la tienda: 1–3 instala módulos, 4–5 usa items de un solo uso (cebo dorado / purga). También: upgrade <id>, item <id>.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez).'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
     ];
     for(const [cmd,desc] of entries){line(cmd,'bright');line('  '+desc);}
     blank();line('Los menús pausan la operación. Cambiar de pestaña también oculta y pausa.','dim');line('Guardado automático en este navegador. Sin conexión entre dispositivos.','dim');line('↑ ↓ historial · Tab completa comandos escritos · Enter ejecuta','dim');
@@ -451,7 +462,19 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       }
       output.append(row);blank();
     });
-    line('Pulsa 1–3 para instalar, o escribe upgrade speed|buffer|luck.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
+    line('items de un solo uso','bright');blank();
+    CONSUMABLES.forEach((it,i)=>{
+      const key=UPGRADES.length+i+1;
+      line(`[${key}] ${it.label}${state.decoded?' / '+it.decoded:''}`,'bright');
+      line('  '+it.description);
+      const row=document.createElement('div');row.className='line';
+      const btn=document.createElement('button');btn.className='row-action';
+      btn.textContent=`  ${fmt(it.cost)} cr  ·  usar [${key}]`+(state.credits<it.cost?'  (faltan '+fmt(it.cost-state.credits)+' cr)':'');
+      btn.addEventListener('click',()=>buyItem(it.id));
+      row.append(btn);
+      output.append(row);blank();
+    });
+    line('Pulsa 1–3 para instalar módulos, 4–5 para usar items, o escribe upgrade <id> / item <id>.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
   }
   function upgrade(id){
     if(hidden||locked)return false;
@@ -462,6 +485,20 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     const cost=price(state,u);
     if(state.credits<cost){const msg=`${u.label}: necesitas ${fmt(cost)} cr. Faltan ${fmt(cost-state.credits)} cr.`;addLog(msg);shopMessage=msg;showView('shop');return false;}
     state.credits-=cost;state.upgrades[u.id]++;const msg=`module installed: ${u.label} v${state.upgrades[u.id]}  −${fmt(cost)} cr`;addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();showView('shop');return true;
+  }
+  function buyItem(id){
+    if(hidden||locked)return false;
+    if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de comprar items.');if(view!=='logs')showView('logs');return false;}
+    const item=CONSUMABLES.find(x=>x.id===id||x.label===id);
+    if(!item){addLog('Objeto no encontrado. Usa shop.');if(view!=='logs')showView('logs');return false;}
+    if(item.id==='golden'&&state.goldenPending){const msg='cebo dorado: ya tienes uno activo para la próxima operación.';addLog(msg);shopMessage=msg;showView('shop');return false;}
+    if(item.id==='purge'&&SPECIES.every(f=>f.node!==state.node||state.collection[f.id])){const msg='purga: ya tienes todos los registros de este nodo.';addLog(msg);shopMessage=msg;showView('shop');return false;}
+    if(state.credits<item.cost){const msg=`${item.label}: necesitas ${fmt(item.cost)} cr. Faltan ${fmt(item.cost-state.credits)} cr.`;addLog(msg);shopMessage=msg;showView('shop');return false;}
+    state.credits-=item.cost;
+    let msg;
+    if(item.id==='golden'){state.goldenPending=true;msg=`cebo dorado activado: la próxima operación será de prioridad alta  −${fmt(item.cost)} cr`;}
+    else{state.nodeDry[state.node]=10;msg=`purga aplicada en ${nodeLabel(state.node)}  −${fmt(item.cost)} cr`;}
+    addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();showView('shop');return true;
   }
   function renderNodes(){
     line('nodes / destinos disponibles','bright');blank();
@@ -534,6 +571,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(['catalog','collection','index','c'].includes(cmd)){showView('catalog');return true;}
     if(['shop','modules'].includes(cmd)){showView('shop');return true;}
     if(['upgrade','u'].includes(cmd)){if(args[0])return upgrade(args[0]);showView('shop');return true;}
+    if(['item','use'].includes(cmd)&&args[0]){
+      const it=CONSUMABLES.find(c=>c.id===args[0]||c.label===args[0]);
+      if(it)return buyItem(it.id);
+      addLog('Objeto no encontrado. Usa shop.');return false;
+    }
     if(['r','rojo','red'].includes(cmd)&&phase==='gamble')return stakeGamble('rojo');
     if(['n','negro','black'].includes(cmd)&&phase==='gamble')return stakeGamble('negro');
     if(['v','verde','green'].includes(cmd)&&phase==='gamble')return stakeGamble('verde');
@@ -542,7 +584,12 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(['goals','achievements'].includes(cmd)){showView('achievements');return true;}
     if(['nodes','map'].includes(cmd)){showView('nodes');return true;}
     if(['node','connect'].includes(cmd)){const n=NODES.findIndex(n=>n.id===args[0]);return switchNode(n>=0?n:Number(args[0])-1);}
-    if(/^[1-4]$/.test(cmd)){if(view==='shop'){const u=UPGRADES[Number(cmd)-1];return u?upgrade(u.id):false;}return switchNode(Number(cmd)-1);}
+    if(/^[1-5]$/.test(cmd)){
+      const n=Number(cmd);
+      if(view==='shop'){if(n<=UPGRADES.length){const u=UPGRADES[n-1];return u?upgrade(u.id):false;}const it=CONSUMABLES[n-UPGRADES.length-1];return it?buyItem(it.id):false;}
+      if(n<=4)return switchNode(n-1);
+      return false;
+    }
     if(['decode','encode'].includes(cmd)){state.decoded=cmd==='decode';rows=[];addLog('output format: '+(state.decoded?'expanded':'compact'),'dim');save();showView(view);return true;}
     if(['clear','cls'].includes(cmd)){clean();return true;}
     if(['pause','exit','hide'].includes(cmd)){cloak();return true;}
@@ -564,12 +611,12 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       finishCatch(elapsed<2500?'cipher-instant':elapsed<4500?'cipher-fast':'cipher-normal',elapsed);
     }
   });
-  const completions=['poll','catalog','upgrade','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
+  const completions=['poll','catalog','upgrade','item','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();hidden?reveal():cloak();input.blur();return;}
     if(e.altKey||e.ctrlKey||e.metaKey||e.isComposing)return;
     if(hidden){if(e.key==='Enter'){e.preventDefault();input.value='';}return;}
-    if(e.repeat&&(e.code==='Space'||['u','1','2','3','4'].includes(e.key))) {e.preventDefault();return;}
+    if(e.repeat&&(e.code==='Space'||['u','1','2','3','4','5'].includes(e.key))) {e.preventDefault();return;}
     if(e.key==='Tab'){
       if(document.activeElement===input&&input.value.trim()){e.preventDefault();const c=completions.filter(c=>c.startsWith(input.value.trim()));if(c.length===1)input.value=c[0];else if(c.length>1){addLog(c.join('  '));showView('logs');}}
       else if(document.activeElement===input||document.activeElement===document.body){e.preventDefault();showView(view==='help'?'logs':'help');input.blur();}
@@ -586,7 +633,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(e.key==='u'){e.preventDefault();showView(view==='shop'?'logs':'shop');return;}
     if(e.key==='s'){e.preventDefault();showView(view==='stats'?'logs':'stats');return;}
     if(phase==='gamble'&&/^[rnv]$/.test(e.key)){e.preventDefault();stakeGamble(e.key==='r'?'rojo':e.key==='n'?'negro':'verde');return;}
-    if(/^[1-4]$/.test(e.key)){e.preventDefault();if(view==='shop'){const u=UPGRADES[Number(e.key)-1];if(u)upgrade(u.id);return;}switchNode(Number(e.key)-1);return;}
+    if(/^[1-5]$/.test(e.key)){
+      e.preventDefault();const n=Number(e.key);
+      if(view==='shop'){if(n<=UPGRADES.length){const u=UPGRADES[n-1];if(u)upgrade(u.id);}else{const it=CONSUMABLES[n-UPGRADES.length-1];if(it)buyItem(it.id);}return;}
+      if(n<=4)switchNode(n-1);return;
+    }
     if(e.key==='?'||e.key==='F1'){e.preventDefault();showView('help');return;}
     if(e.key.length===1){input.focus();}
   });
