@@ -515,12 +515,14 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   }
   function equipGolden(){
     if(hidden||locked)return false;
-    if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de equipar cebo.');if(view!=='logs')showView('logs');return false;}
-    if(state.goldenPending){const msg='cebo dorado: ya tienes uno equipado para la próxima operación.';addLog(msg);shopMessage=msg;showView('shop');return false;}
-    if(state.items.golden<=0){const msg='cebo dorado: no tienes stock. Cómpralo primero.';addLog(msg);shopMessage=msg;showView('shop');return false;}
+    if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de equipar cebo.');return false;}
+    if(state.goldenPending){const msg='cebo dorado: ya tienes uno equipado para la próxima operación.';addLog(msg);shopMessage=msg;if(view==='shop')showView('shop');return false;}
+    if(state.items.golden<=0){const msg='cebo dorado: no tienes stock. Cómpralo primero.';addLog(msg);shopMessage=msg;if(view==='shop')showView('shop');return false;}
     state.items.golden--;state.goldenPending=true;
     const msg=`cebo dorado equipado  ·  ${state.items.golden}/${GOLDEN_MAX} en stock`;
-    addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();showView('shop');return true;
+    addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();metrics();
+    if(view==='shop')showView('shop');
+    return true;
   }
   function renderNodes(){
     line('nodes / destinos disponibles','bright');blank();
