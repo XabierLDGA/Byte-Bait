@@ -147,9 +147,10 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     {id:'luck',label:'decoder',decoded:'Cebo',base:70,description:'Más registros raros y nuevos',max:8}
   ];
   const CONSUMABLES = [
-    {id:'golden',label:'cebo dorado',decoded:'Cebo dorado',cost:200,description:'La próxima operación es de prioridad alta (registro raro o legendario garantizado).'},
+    {id:'golden',label:'cebo dorado',decoded:'Cebo dorado',cost:200,description:'Stock apilable. Equípalo (tecla c en la tienda) para que la próxima operación sea de prioridad alta (registro raro o legendario garantizado).'},
     {id:'purge',label:'purga',decoded:'Purga de racha seca',cost:120,description:'La próxima operación en este nodo prioriza un registro nuevo, si queda alguno.'}
   ];
+  const GOLDEN_MAX=15;
   const ACHIEVEMENTS = [
     {id:'first',label:'Primer paquete',decoded:'Primera captura',reward:25,met:s=>s.caught>=1},
     {id:'ten',label:'Lote de 10',decoded:'Diez capturas',reward:80,met:s=>s.caught>=10},
@@ -161,7 +162,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     {id:'hundred',label:'Lote de 100',decoded:'Cien capturas',reward:450,met:s=>s.caught>=100},
     {id:'all',label:'Índice íntegro',decoded:'Las 24 especies',reward:1500,met:s=>SPECIES.every(f=>s.collection[f.id])}
   ];
-  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],nodesUnlocked:[true,false,false,false],goldenPending:false,bestWeight:0,bestReactionMs:null,bestCipherMs:null,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
+  function fresh(){return {version:VERSION,credits:0,earned:0,caught:0,casts:0,missed:0,perfects:0,streak:0,bestStreak:0,node:0,upgrades:{speed:0,buffer:0,luck:0},collection:{},achievements:[],nodeCatches:[0,0,0,0],nodeDry:[0,0,0,0],nodesUnlocked:[true,false,false,false],goldenPending:false,items:{golden:0},bestWeight:0,bestReactionMs:null,bestCipherMs:null,decoded:false,createdAt:Date.now(),updatedAt:Date.now()};}
   function finite(n,min=0,max=MAX){return typeof n==='number'&&Number.isFinite(n)&&n>=min&&n<=max;}
   function validate(raw){
     if(!raw||typeof raw!=='object'||raw.version!==VERSION)throw Error('Versión de sesión no compatible.');
@@ -191,6 +192,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     s.nodesUnlocked=Array.isArray(raw.nodesUnlocked)&&raw.nodesUnlocked.length===4&&raw.nodesUnlocked.every(b=>typeof b==='boolean')?raw.nodesUnlocked.slice():s.nodeCatches.map((c,i)=>i===0||c>0);
     s.nodesUnlocked[0]=true;
     s.goldenPending=raw.goldenPending===true;
+    s.items={golden:Number.isInteger(raw.items?.golden)&&raw.items.golden>=0&&raw.items.golden<=GOLDEN_MAX?raw.items.golden:0};
     return s;
   }
   function price(s,u){return Math.round(u.base*Math.pow(1.8,s.upgrades[u.id]));}
@@ -427,7 +429,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       ['timing','Confirmar justo al llegar RESPONSE_READY da bonus: instantáneo x2, rápido x1.5.'],
       ['checksum','A veces aparece un checksum al llegar la respuesta: tienes que escribirlo para confirmar (espacio no vale esta vez), y cuanto más rápido, más bonus, hasta x2.5.'],
       ['r / n / v','Tras una captura (o tras ganar): apostar el crédito a rojo, negro o verde (18/18/1 sobre 37, probabilidades reales). Puedes encadenar apuestas tras ganar, o [ESPACIO] para cobrar y parar.'],
-      ['c / catalog','Abrir el índice de registros.'],['u / shop','Abrir la tienda: 1–3 instala módulos, 4–5 usa items de un solo uso (cebo dorado / purga). También: upgrade <id>, item <id>.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez).'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
+      ['c / catalog','Abrir el índice de registros.'],['u / shop','Abrir la tienda: 1–3 instala módulos, 4–5 compra items. El cebo dorado se apila (máx 15); [c] en la tienda equipa uno para la próxima operación. También: upgrade <id>, item <id>, equip/cebo.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez).'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
     ];
     for(const [cmd,desc] of entries){line(cmd,'bright');line('  '+desc);}
     blank();line('Los menús pausan la operación. Cambiar de pestaña también oculta y pausa.','dim');line('Guardado automático en este navegador. Sin conexión entre dispositivos.','dim');line('↑ ↓ historial · Tab completa comandos escritos · Enter ejecuta','dim');
@@ -462,19 +464,29 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       }
       output.append(row);blank();
     });
-    line('items de un solo uso','bright');blank();
+    line('items','bright');blank();
     CONSUMABLES.forEach((it,i)=>{
       const key=UPGRADES.length+i+1;
-      line(`[${key}] ${it.label}${state.decoded?' / '+it.decoded:''}`,'bright');
+      const stockText=it.id==='golden'?`  (tienes ${state.items.golden}/${GOLDEN_MAX})`:'';
+      line(`[${key}] ${it.label}${state.decoded?' / '+it.decoded:''}${stockText}`,'bright');
       line('  '+it.description);
       const row=document.createElement('div');row.className='line';
+      const capped=it.id==='golden'&&state.items.golden>=GOLDEN_MAX;
       const btn=document.createElement('button');btn.className='row-action';
-      btn.textContent=`  ${fmt(it.cost)} cr  ·  usar [${key}]`+(state.credits<it.cost?'  (faltan '+fmt(it.cost-state.credits)+' cr)':'');
-      btn.addEventListener('click',()=>buyItem(it.id));
+      btn.textContent=capped?`  MAX (${GOLDEN_MAX})`:`  ${fmt(it.cost)} cr  ·  comprar [${key}]`+(state.credits<it.cost?'  (faltan '+fmt(it.cost-state.credits)+' cr)':'');
+      if(!capped)btn.addEventListener('click',()=>buyItem(it.id));
       row.append(btn);
-      output.append(row);blank();
+      output.append(row);
+      if(it.id==='golden'){
+        const eqRow=document.createElement('div');eqRow.className='line';
+        const eqBtn=document.createElement('button');eqBtn.className='row-action';
+        eqBtn.textContent=state.goldenPending?'  equipado para la próxima operación':(state.items.golden>0?'  equipar [c]':'  sin stock para equipar');
+        if(!state.goldenPending&&state.items.golden>0)eqBtn.addEventListener('click',()=>equipGolden());
+        eqRow.append(eqBtn);output.append(eqRow);
+      }
+      blank();
     });
-    line('Pulsa 1–3 para instalar módulos, 4–5 para usar items, o escribe upgrade <id> / item <id>.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
+    line('Pulsa 1–3 para instalar módulos, 4–5 para comprar items, [c] para equipar cebo dorado.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
   }
   function upgrade(id){
     if(hidden||locked)return false;
@@ -491,13 +503,22 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de comprar items.');if(view!=='logs')showView('logs');return false;}
     const item=CONSUMABLES.find(x=>x.id===id||x.label===id);
     if(!item){addLog('Objeto no encontrado. Usa shop.');if(view!=='logs')showView('logs');return false;}
-    if(item.id==='golden'&&state.goldenPending){const msg='cebo dorado: ya tienes uno activo para la próxima operación.';addLog(msg);shopMessage=msg;showView('shop');return false;}
+    if(item.id==='golden'&&state.items.golden>=GOLDEN_MAX){const msg=`cebo dorado: ya tienes el máximo (${GOLDEN_MAX}).`;addLog(msg);shopMessage=msg;showView('shop');return false;}
     if(item.id==='purge'&&SPECIES.every(f=>f.node!==state.node||state.collection[f.id])){const msg='purga: ya tienes todos los registros de este nodo.';addLog(msg);shopMessage=msg;showView('shop');return false;}
     if(state.credits<item.cost){const msg=`${item.label}: necesitas ${fmt(item.cost)} cr. Faltan ${fmt(item.cost-state.credits)} cr.`;addLog(msg);shopMessage=msg;showView('shop');return false;}
     state.credits-=item.cost;
     let msg;
-    if(item.id==='golden'){state.goldenPending=true;msg=`cebo dorado activado: la próxima operación será de prioridad alta  −${fmt(item.cost)} cr`;}
+    if(item.id==='golden'){state.items.golden++;msg=`cebo dorado comprado (${state.items.golden}/${GOLDEN_MAX} en stock)  −${fmt(item.cost)} cr`;}
     else{state.nodeDry[state.node]=10;msg=`purga aplicada en ${nodeLabel(state.node)}  −${fmt(item.cost)} cr`;}
+    addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();showView('shop');return true;
+  }
+  function equipGolden(){
+    if(hidden||locked)return false;
+    if(isBusy()){addLog('409 BUSY  ·  Termina la operación antes de equipar cebo.');if(view!=='logs')showView('logs');return false;}
+    if(state.goldenPending){const msg='cebo dorado: ya tienes uno equipado para la próxima operación.';addLog(msg);shopMessage=msg;showView('shop');return false;}
+    if(state.items.golden<=0){const msg='cebo dorado: no tienes stock. Cómpralo primero.';addLog(msg);shopMessage=msg;showView('shop');return false;}
+    state.items.golden--;state.goldenPending=true;
+    const msg=`cebo dorado equipado  ·  ${state.items.golden}/${GOLDEN_MAX} en stock`;
     addLog(msg,'bright');shopMessage=msg;shopMessageKind='bright';save();showView('shop');return true;
   }
   function renderNodes(){
@@ -524,7 +545,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   function renderStats(){
     line('session / status','bright');blank();
     for(const [key,val] of [
-      ['Crédito disponible',fmt(state.credits)+' cr'],['Crédito total obtenido',fmt(state.earned)+' cr'],['Operaciones completadas',state.caught],['Solicitudes enviadas',state.casts],['Operaciones fallidas',state.missed],['Confirmaciones perfectas',state.perfects],['Mejor reacción',state.bestReactionMs!=null?(state.bestReactionMs/1000).toFixed(2)+'s':'—'],['Mejor checksum',state.bestCipherMs!=null?(state.bestCipherMs/1000).toFixed(2)+'s':'—'],['Racha actual / mejor',state.streak+' / '+state.bestStreak],['Registros descubiertos',Object.keys(state.collection).length+' / 24'],['Mayor '+(state.decoded?'peso':'payload'),kg(state.bestWeight)+(state.decoded?' kg':' MB')],['Hitos completados',state.achievements.length+' / '+ACHIEVEMENTS.length],['Nodo activo',nodeLabel(state.node)],['Guardado',storageOK?'automático · solo este navegador':'no disponible · usa export']
+      ['Crédito disponible',fmt(state.credits)+' cr'],['Crédito total obtenido',fmt(state.earned)+' cr'],['Operaciones completadas',state.caught],['Solicitudes enviadas',state.casts],['Operaciones fallidas',state.missed],['Confirmaciones perfectas',state.perfects],['Mejor reacción',state.bestReactionMs!=null?(state.bestReactionMs/1000).toFixed(2)+'s':'—'],['Mejor checksum',state.bestCipherMs!=null?(state.bestCipherMs/1000).toFixed(2)+'s':'—'],['Cebo dorado',state.items.golden+'/'+GOLDEN_MAX+(state.goldenPending?'  (1 equipado)':'')],['Racha actual / mejor',state.streak+' / '+state.bestStreak],['Registros descubiertos',Object.keys(state.collection).length+' / 24'],['Mayor '+(state.decoded?'peso':'payload'),kg(state.bestWeight)+(state.decoded?' kg':' MB')],['Hitos completados',state.achievements.length+' / '+ACHIEVEMENTS.length],['Nodo activo',nodeLabel(state.node)],['Guardado',storageOK?'automático · solo este navegador':'no disponible · usa export']
     ])line(key+': '+val);
   }
   function renderAchievements(){
@@ -571,6 +592,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(['catalog','collection','index','c'].includes(cmd)){showView('catalog');return true;}
     if(['shop','modules'].includes(cmd)){showView('shop');return true;}
     if(['upgrade','u'].includes(cmd)){if(args[0])return upgrade(args[0]);showView('shop');return true;}
+    if(['equip','cebo'].includes(cmd))return equipGolden();
     if(['item','use'].includes(cmd)&&args[0]){
       const it=CONSUMABLES.find(c=>c.id===args[0]||c.label===args[0]);
       if(it)return buyItem(it.id);
@@ -611,7 +633,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       finishCatch(elapsed<2500?'cipher-instant':elapsed<4500?'cipher-fast':'cipher-normal',elapsed);
     }
   });
-  const completions=['poll','catalog','upgrade','item','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
+  const completions=['poll','catalog','upgrade','item','equip','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();hidden?reveal():cloak();input.blur();return;}
     if(e.altKey||e.ctrlKey||e.metaKey||e.isComposing)return;
@@ -629,6 +651,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     }
     if(e.code==='Space'){e.preventDefault();action();return;}
     if(e.target instanceof HTMLButtonElement)return;
+    if(view==='shop'&&e.key==='c'){e.preventDefault();equipGolden();return;}
     if(e.key==='c'){e.preventDefault();showView(view==='catalog'?'logs':'catalog');return;}
     if(e.key==='u'){e.preventDefault();showView(view==='shop'?'logs':'shop');return;}
     if(e.key==='s'){e.preventDefault();showView(view==='stats'?'logs':'stats');return;}
