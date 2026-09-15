@@ -115,6 +115,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     <button class="desktop-action" data-action="poll"><span class="key">[espacio]</span> ejecutar</button>
     <button data-action="catalog"><span class="key">[c]</span> registro</button>
     <button data-action="upgrade"><span class="key">[u]</span> tienda</button>
+    <button data-action="equip"><span class="key">[d]</span> equipar cebo</button>
     <button data-action="help"><span class="key">[tab]</span> comandos</button>
     <button data-action="hide"><span class="key">[esc]</span> ocultar</button>
     <span class="local" id="save-status">sesión local</span>
@@ -666,7 +667,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   });
   document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',()=>{
     const a=btn.dataset.action;if(hidden&&a!=='fullscreen'){if(a==='hide')reveal();btn.blur();return;}
-    if(a==='poll')action();else if(a==='hide')cloak();else if(a==='catalog')showView(view==='catalog'?'logs':'catalog');else if(a==='help')showView(view==='help'?'logs':'help');else if(a==='upgrade')showView(view==='shop'?'logs':'shop');else if(a==='fullscreen')void fullscreen();else if(a==='new')clean();btn.blur();
+    if(a==='poll')action();else if(a==='hide')cloak();else if(a==='catalog')showView(view==='catalog'?'logs':'catalog');else if(a==='help')showView(view==='help'?'logs':'help');else if(a==='upgrade')showView(view==='shop'?'logs':'shop');else if(a==='equip')equipGolden();else if(a==='fullscreen')void fullscreen();else if(a==='new')clean();btn.blur();
   }));
   terminal.addEventListener('click',e=>{if(!window.getSelection()?.toString()&&!(e.target instanceof HTMLButtonElement))input.focus({preventScroll:true});});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)cloak();});
