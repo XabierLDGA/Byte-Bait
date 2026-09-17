@@ -97,7 +97,7 @@
 Copyright (C) Microsoft Corporation. All rights reserved.</div>
     <div class="boot-command" id="boot"><span>PS C:\Users\dev&gt; </span><span class="bright">node .\session-monitor.js</span></div>
     <section id="game" aria-label="Sesión">
-      <div id="output" class="output"><div class="line bright">Session Monitor [Version 1.0.0]</div><div class="line dim">Conexión local establecida. Sesión sin audio.</div><div class="line"></div><div class="line">Pulsa ESPACIO para ejecutar una operación.</div><div class="line">Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Cuanto más rápido, más crédito. Si te adelantas, se cancela.</div><div class="line">A veces aparece un checksum: escríbelo rápido para un bonus mayor.</div><div class="line">Tras cada captura puedes apostar el crédito en la ruleta: rojo, negro o verde.</div><div class="line">Los registros nuevos dan crédito extra. [u] abre la tienda de módulos.</div><div class="line"></div><div class="line dim">[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver</div><div class="line dim">decode expande los identificadores; encode restaura el formato compacto.</div><div class="line"></div></div>
+      <div id="output" class="output"><div class="line bright">Session Monitor [Version 1.0.0]</div><div class="line dim">Conexión local establecida. Sesión sin audio.</div><div class="line"></div><div class="line">Pulsa ESPACIO para ejecutar una operación.</div><div class="line">Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Cuanto más rápido, más crédito. Si te adelantas, se cancela.</div><div class="line">A veces aparece un checksum: escríbelo rápido para un bonus mayor.</div><div class="line">Tras cada captura puedes apostar el crédito en la ruleta: rojo, negro o verde.</div><div class="line">Los registros nuevos dan crédito extra. [t] abre la tienda de módulos.</div><div class="line"></div><div class="line dim">[tab] comandos   [r] índice   [1–4] nodo   [esc] ocultar / volver</div><div class="line dim">decode expande los identificadores; encode restaura el formato compacto.</div><div class="line"></div></div>
       <div id="log" role="log" aria-label="Registro de operaciones" aria-live="polite" aria-relevant="additions"></div>
       <div class="session" id="session">
         <div id="metrics" class="session-line dim">local  /  428 cr  /  16 ops  /  index 5/24  /  chain 15</div>
@@ -113,9 +113,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   <footer class="footer" id="footer">
     <button class="mobile-action" id="touch-action" data-action="poll">[ ejecutar ]</button>
     <button class="desktop-action" data-action="poll"><span class="key">[espacio]</span> ejecutar</button>
-    <button data-action="catalog"><span class="key">[c]</span> registro</button>
-    <button data-action="upgrade"><span class="key">[u]</span> tienda</button>
-    <button data-action="equip"><span class="key">[d]</span> equipar cebo</button>
+    <button data-action="catalog"><span class="key">[r]</span> registro</button>
+    <button data-action="upgrade"><span class="key">[t]</span> tienda</button>
+    <button data-action="equip"><span class="key">[c]</span> equipar cebo</button>
     <button data-action="help"><span class="key">[tab]</span> comandos</button>
     <button data-action="hide"><span class="key">[esc]</span> ocultar</button>
     <span class="local" id="save-status">sesión local</span>
@@ -131,9 +131,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
   const MAX = 1e12;
   const NODES = [
     {id:'local',name:'Estanque',need:0,cost:0},
-    {id:'stream',name:'Río',need:12,cost:150},
-    {id:'remote',name:'Costa',need:35,cost:500},
-    {id:'deep',name:'Abismo',need:70,cost:1500}
+    {id:'stream',name:'Río',need:12,cost:1500},
+    {id:'remote',name:'Costa',need:35,cost:5000},
+    {id:'deep',name:'Abismo',need:70,cost:15000}
   ];
   const SPECIES = [
     ['L01','Alburno',0,0,8,.04,.18],['L02','Perca',0,0,12,.15,1.2],['L03','Carpa',0,1,23,1,6],['L04','Tenca',0,1,30,.4,3.5],['L05','Lucio',0,2,65,2,12],['L06','Carpa dorada',0,3,160,.5,4],
@@ -412,7 +412,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(next!=='logs')pauseForView();else resumeFromView();
     view=next;output.replaceChildren();log.hidden=next!=='logs';$('session').hidden=next!=='logs';
     if(next==='logs'){
-      if(!rows.length){line('Session Monitor [Version 1.0.0]','bright');line('Conexión local establecida. Sesión sin audio.','dim');blank();line('Pulsa ESPACIO para ejecutar una operación.');line('Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Cuanto más rápido, más crédito. Si te adelantas, se cancela.');line('A veces aparece un checksum: escríbelo rápido para un bonus mayor.');line('Tras cada captura puedes apostar el crédito en la ruleta: rojo, negro o verde.');line('Los registros nuevos dan crédito extra. [u] abre la tienda de módulos.');blank();line('[tab] comandos   [c] índice   [1–4] nodo   [esc] ocultar / volver','dim');line('decode expande los identificadores; encode restaura el formato compacto.','dim');blank();if(loadMessage){line(loadMessage);blank();}}
+      if(!rows.length){line('Session Monitor [Version 1.0.0]','bright');line('Conexión local establecida. Sesión sin audio.','dim');blank();line('Pulsa ESPACIO para ejecutar una operación.');line('Cuando aparezca RESPONSE_READY, pulsa ESPACIO otra vez. Cuanto más rápido, más crédito. Si te adelantas, se cancela.');line('A veces aparece un checksum: escríbelo rápido para un bonus mayor.');line('Tras cada captura puedes apostar el crédito en la ruleta: rojo, negro o verde.');line('Los registros nuevos dan crédito extra. [t] abre la tienda de módulos.');blank();line('[tab] comandos   [r] índice   [1–4] nodo   [esc] ocultar / volver','dim');line('decode expande los identificadores; encode restaura el formato compacto.','dim');blank();if(loadMessage){line(loadMessage);blank();}}
       renderLogs();if(!isBusy())idleSignal();else tick();
     }else if(next==='help')renderHelp();
     else if(next==='catalog')renderCatalog();
@@ -430,7 +430,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       ['timing','Confirmar justo al llegar RESPONSE_READY da bonus: instantáneo x2, rápido x1.5.'],
       ['checksum','A veces aparece un checksum al llegar la respuesta: tienes que escribirlo para confirmar (espacio no vale esta vez), y cuanto más rápido, más bonus, hasta x2.5.'],
       ['r / n / v','Tras una captura (o tras ganar): apostar el crédito a rojo, negro o verde (18/18/1 sobre 37, probabilidades reales). Puedes encadenar apuestas tras ganar, o [ESPACIO] para cobrar y parar.'],
-      ['c / catalog','Abrir el índice de registros.'],['u / shop','Abrir la tienda: 1–3 instala módulos, 4–5 compra items. El cebo dorado se apila (máx 15); [d] equipa uno para la próxima operación. También: upgrade <id>, item <id>, equip/cebo.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez).'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
+      ['r / catalog','Abrir el índice de registros.'],['t / shop','Abrir la tienda: 1–3 instala módulos, 4–5 compra items. El cebo dorado se apila (máx 15); [c] equipa uno para la próxima operación. También: upgrade <id>, item <id>, equip/cebo.'],['1–4 / nodes','Cambiar de nodo; se desbloquean al completar operaciones y pagar el coste de conexión (una sola vez).'],['s / status','Crédito, récords y estadísticas.'],['goals','Ver hitos; las recompensas se cobran automáticamente.'],['decode / encode','Mostrar nombres extendidos / identificadores compactos.'],['clear / cls','Limpiar los registros visibles, conservar el progreso.'],['export / import','Descargar una copia / recuperar una copia de la sesión.'],['ESC / pause','Ocultar todo; ESC de nuevo para volver.'],['fullscreen','Activar o salir de pantalla completa.'],['reset','Empezar de cero, con confirmación.']
     ];
     for(const [cmd,desc] of entries){line(cmd,'bright');line('  '+desc);}
     blank();line('Los menús pausan la operación. Cambiar de pestaña también oculta y pausa.','dim');line('Guardado automático en este navegador. Sin conexión entre dispositivos.','dim');line('↑ ↓ historial · Tab completa comandos escritos · Enter ejecuta','dim');
@@ -481,13 +481,13 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       if(it.id==='golden'){
         const eqRow=document.createElement('div');eqRow.className='line';
         const eqBtn=document.createElement('button');eqBtn.className='row-action';
-        eqBtn.textContent=state.goldenPending?'  equipado para la próxima operación':(state.items.golden>0?'  equipar [d]':'  sin stock para equipar');
+        eqBtn.textContent=state.goldenPending?'  equipado para la próxima operación':(state.items.golden>0?'  equipar [c]':'  sin stock para equipar');
         if(!state.goldenPending&&state.items.golden>0)eqBtn.addEventListener('click',()=>equipGolden());
         eqRow.append(eqBtn);output.append(eqRow);
       }
       blank();
     });
-    line('Pulsa 1–3 para instalar módulos, 4–5 para comprar items, [d] para equipar cebo dorado.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
+    line('Pulsa 1–3 para instalar módulos, 4–5 para comprar items, [c] para equipar cebo dorado.','dim');line('latency: −10% de espera/nivel · buffer: +0,4 s/nivel','dim');line('decoder: más probabilidad de prioridades 02 y 03, registros nuevos y checksums','dim');
   }
   function upgrade(id){
     if(hidden||locked)return false;
@@ -592,10 +592,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     const [cmd,...args]=trimmed.toLowerCase().split(/\s+/);input.value='';
     if(['poll','cast','run','reel'].includes(cmd))return action();
     if(['help','ayuda','?'].includes(cmd)){showView('help');return true;}
-    if(['catalog','collection','index','c'].includes(cmd)){showView('catalog');return true;}
     if(['shop','modules'].includes(cmd)){showView('shop');return true;}
-    if(['upgrade','u'].includes(cmd)){if(args[0])return upgrade(args[0]);showView('shop');return true;}
-    if(['equip','cebo','d'].includes(cmd))return equipGolden();
+    if(['upgrade','t'].includes(cmd)){if(args[0])return upgrade(args[0]);showView('shop');return true;}
+    if(['equip','cebo','c'].includes(cmd))return equipGolden();
     if(['item','use'].includes(cmd)&&args[0]){
       const it=CONSUMABLES.find(c=>c.id===args[0]||c.label===args[0]);
       if(it)return buyItem(it.id);
@@ -605,6 +604,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     if(['n','negro','black'].includes(cmd)&&phase==='gamble')return stakeGamble('negro');
     if(['v','verde','green'].includes(cmd)&&phase==='gamble')return stakeGamble('verde');
     if(cmd==='cobrar'&&phase==='gamble'){skipGamble();return true;}
+    if(['catalog','collection','index','r'].includes(cmd)){showView('catalog');return true;}
     if(['status','stats','s'].includes(cmd)){showView('stats');return true;}
     if(['goals','achievements'].includes(cmd)){showView('achievements');return true;}
     if(['nodes','map'].includes(cmd)){showView('nodes');return true;}
@@ -636,12 +636,12 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
       finishCatch(elapsed<2500?'cipher-instant':elapsed<4500?'cipher-fast':'cipher-normal',elapsed);
     }
   });
-  const completions=['poll','catalog','upgrade','item','equip','cebo','d','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
+  const completions=['poll','catalog','upgrade','item','equip','cebo','c','shop','status','nodes','node','goals','decode','encode','clear','export','import','fullscreen','pause','reset','help'];
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();hidden?reveal():cloak();input.blur();return;}
     if(e.altKey||e.ctrlKey||e.metaKey||e.isComposing)return;
     if(hidden){if(e.key==='Enter'){e.preventDefault();input.value='';}return;}
-    if(e.repeat&&(e.code==='Space'||['u','1','2','3','4','5'].includes(e.key))) {e.preventDefault();return;}
+    if(e.repeat&&(e.code==='Space'||['t','1','2','3','4','5'].includes(e.key))) {e.preventDefault();return;}
     if(e.key==='Tab'){
       if(document.activeElement===input&&input.value.trim()){e.preventDefault();const c=completions.filter(c=>c.startsWith(input.value.trim()));if(c.length===1)input.value=c[0];else if(c.length>1){addLog(c.join('  '));showView('logs');}}
       else if(document.activeElement===input||document.activeElement===document.body){e.preventDefault();showView(view==='help'?'logs':'help');input.blur();}
@@ -654,11 +654,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.</div>
     }
     if(e.code==='Space'){e.preventDefault();action();return;}
     if(e.target instanceof HTMLButtonElement)return;
-    if(e.key==='c'){e.preventDefault();showView(view==='catalog'?'logs':'catalog');return;}
-    if(e.key==='d'){e.preventDefault();equipGolden();return;}
-    if(e.key==='u'){e.preventDefault();showView(view==='shop'?'logs':'shop');return;}
-    if(e.key==='s'){e.preventDefault();showView(view==='stats'?'logs':'stats');return;}
     if(phase==='gamble'&&/^[rnv]$/.test(e.key)){e.preventDefault();stakeGamble(e.key==='r'?'rojo':e.key==='n'?'negro':'verde');return;}
+    if(e.key==='r'){e.preventDefault();showView(view==='catalog'?'logs':'catalog');return;}
+    if(e.key==='c'){e.preventDefault();equipGolden();return;}
+    if(e.key==='t'){e.preventDefault();showView(view==='shop'?'logs':'shop');return;}
+    if(e.key==='s'){e.preventDefault();showView(view==='stats'?'logs':'stats');return;}
     if(/^[1-5]$/.test(e.key)){
       e.preventDefault();const n=Number(e.key);
       if(view==='shop'){if(n<=UPGRADES.length){const u=UPGRADES[n-1];if(u)upgrade(u.id);}else{const it=CONSUMABLES[n-UPGRADES.length-1];if(it)buyItem(it.id);}return;}
